@@ -170,6 +170,15 @@ flowchart TB
 
 Issues and pull requests are welcome. Keep additions provider-aware, keyboard accessible, and consistent with the existing component and color system.
 
+## Authors
+
+InfraCanvas is an original idea jointly conceived by:
+
+| Author | Contribution |
+| --- | --- |
+| **Karthik Meduri** | Co-author and co-creator |
+| **Sai Sravan Meduri** | Co-author and co-creator |
+
 ## License
 
 MIT — use it, adapt it, and build something excellent.
