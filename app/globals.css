@@ -669,26 +669,26 @@ select:focus-visible {
 .canvas-toolbar {
   position: absolute;
   z-index: 10;
-  top: 14px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  height: 38px;
+  min-height: 52px;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(12px);
   border: 1px solid #dfe1e6;
-  border-radius: 9px;
-  padding: 3px;
-  box-shadow: 0 5px 18px rgba(31, 34, 47, 0.09);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 7px 24px rgba(31, 34, 47, 0.12);
 }
 
 .canvas-toolbar button {
   min-width: 30px;
-  height: 30px;
+  height: 34px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: #676b78;
   font-size: 10px;
@@ -700,6 +700,65 @@ select:focus-visible {
 .canvas-toolbar button.selected {
   background: #eeebff;
   color: #5d4ed0;
+}
+
+.canvas-toolbar .hand-tool-button,
+.canvas-toolbar .connection-tool-button {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+}
+
+.canvas-toolbar .connection-tool-button {
+  min-width: 128px;
+  color: #4e456f;
+  background: linear-gradient(135deg, #f2efff, #e9f5ff);
+  border-color: #d8d1ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.canvas-toolbar .connection-tool-button:hover:not(:disabled),
+.canvas-toolbar .connection-tool-button.selected {
+  color: white;
+  border-color: #6957e7;
+  background: linear-gradient(135deg, #725cf5, #5545c7);
+  box-shadow: 0 6px 15px rgba(103, 84, 224, 0.24);
+}
+
+.canvas-toolbar .hand-tool-button {
+  min-width: 100px;
+  background: #f7f7f9;
+  border-color: #e1e2e8;
+}
+
+.canvas-toolbar .hand-tool-button.selected {
+  color: #4538a3;
+  border-color: #cfc7fb;
+  background: #ece9ff;
+}
+
+.tool-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.05;
+}
+
+.tool-copy strong {
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.tool-copy small {
+  color: currentColor;
+  font-size: 7px;
+  font-weight: 600;
+  opacity: 0.66;
 }
 
 .canvas-toolbar button:disabled {
@@ -721,14 +780,85 @@ select:focus-visible {
 }
 
 .connector-icon {
-  width: 13px;
-  height: 7px;
-  display: inline-block;
-  border-top: 1.5px solid currentColor;
-  border-right: 1.5px solid currentColor;
-  transform: skewX(-28deg);
-  margin-right: 5px;
+  width: 24px;
+  height: 18px;
+  display: block;
+  flex: 0 0 24px;
+  position: relative;
 }
+
+.connector-icon::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transform: rotate(-18deg);
+}
+
+.connector-icon i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: white;
+  top: 6px;
+}
+
+.connector-icon i:first-child {
+  left: 0;
+}
+
+.connector-icon i:last-child {
+  right: 0;
+  top: 1px;
+}
+
+.connection-tool-button.selected .connector-icon i,
+.connection-tool-button:hover .connector-icon i {
+  background: #725cf5;
+}
+
+.hand-icon {
+  width: 21px;
+  height: 22px;
+  display: block;
+  flex: 0 0 21px;
+  position: relative;
+  border: 2px solid currentColor;
+  border-radius: 7px 7px 9px 9px;
+  transform: rotate(-5deg);
+}
+
+.hand-icon::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 10px;
+  left: -6px;
+  top: 7px;
+  border: 2px solid currentColor;
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+  transform: rotate(20deg);
+}
+
+.hand-icon i {
+  position: absolute;
+  top: -7px;
+  width: 3px;
+  height: 9px;
+  border-radius: 4px;
+  background: currentColor;
+}
+
+.hand-icon i:nth-child(1) { left: 2px; }
+.hand-icon i:nth-child(2) { left: 7px; height: 11px; top: -9px; }
+.hand-icon i:nth-child(3) { left: 12px; }
 
 .diagram-canvas {
   position: relative;
@@ -743,6 +873,22 @@ select:focus-visible {
 
 .diagram-canvas.is-connecting {
   cursor: crosshair;
+}
+
+.diagram-canvas.is-hand-tool {
+  cursor: grab;
+}
+
+.diagram-canvas.is-panning {
+  cursor: grabbing;
+}
+
+.diagram-canvas.is-hand-tool .diagram-node {
+  cursor: grab;
+}
+
+.diagram-canvas.is-panning .diagram-node {
+  cursor: grabbing;
 }
 
 .canvas-content {
@@ -769,6 +915,14 @@ select:focus-visible {
   fill: #8c87ad;
 }
 
+.edge-layer .pending-edge {
+  stroke: #725cf5;
+  stroke-width: 2.5;
+  stroke-dasharray: 8 5;
+  filter: drop-shadow(0 2px 3px rgba(114, 92, 245, 0.28));
+  animation: pending-edge-flow 0.75s linear infinite;
+}
+
 .diagram-node {
   --service-accent: #777;
   position: absolute;
@@ -786,6 +940,7 @@ select:focus-visible {
   box-shadow: 0 5px 14px rgba(35, 38, 54, 0.07);
   user-select: none;
   touch-action: none;
+  cursor: pointer;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -848,21 +1003,42 @@ select:focus-visible {
 }
 
 .node-port {
-  width: 9px;
-  height: 9px;
-  border: 2px solid #a7a3bb;
-  background: white;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #8f87bd;
+  background: #f9f8ff;
   border-radius: 50%;
   position: absolute;
-  top: calc(50% - 4px);
+  top: calc(50% - 14px);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  color: #6254cf;
+  box-shadow: 0 3px 9px rgba(57, 48, 115, 0.16);
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.node-port i {
+  font-style: normal;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.node-port:hover,
+.node-port:focus-visible {
+  color: white;
+  background: #725cf5;
+  border-color: #5e4bd8;
+  box-shadow: 0 0 0 5px rgba(114, 92, 245, 0.13), 0 5px 12px rgba(57, 48, 115, 0.22);
 }
 
 .input-port {
-  left: -5px;
+  left: -15px;
 }
 
 .output-port {
-  right: -5px;
+  right: -15px;
 }
 
 .canvas-badge {
@@ -1386,6 +1562,14 @@ select:focus-visible {
   border-radius: 50%;
 }
 
+.terraform-page {
+  height: calc(100vh - 108px);
+  padding: 18px;
+  background:
+    radial-gradient(circle at 92% 4%, rgba(114, 92, 245, 0.1), transparent 32%),
+    #eceef2;
+}
+
 .code-modal {
   width: min(1180px, 96vw);
   height: min(790px, 92vh);
@@ -1396,6 +1580,14 @@ select:focus-visible {
   display: grid;
   grid-template-rows: 70px 42px minmax(0, 1fr) 54px;
   box-shadow: 0 30px 100px rgba(6, 7, 12, 0.42);
+}
+
+.terraform-page .code-modal {
+  width: 100%;
+  height: 100%;
+  border-color: #d9dbe3;
+  border-radius: 14px;
+  box-shadow: 0 12px 38px rgba(24, 27, 40, 0.12);
 }
 
 .code-modal-header,
@@ -1412,6 +1604,25 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 11px;
+}
+
+.back-design-button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dfe1e7;
+  border-radius: 9px;
+  background: #f7f7f9;
+  color: #646876;
+  font-size: 17px;
+  transition: background 170ms ease, color 170ms ease, border-color 170ms ease;
+}
+
+.back-design-button:hover {
+  color: #5547bb;
+  border-color: #cbc5ee;
+  background: #eeebff;
 }
 
 .code-modal-icon {
@@ -1711,6 +1922,12 @@ select:focus-visible {
   }
 }
 
+@keyframes pending-edge-flow {
+  to {
+    stroke-dashoffset: -13;
+  }
+}
+
 @media (max-width: 1120px) {
   .workspace {
     grid-template-columns: 250px minmax(420px, 1fr) 285px;
@@ -1842,6 +2059,15 @@ select:focus-visible {
     transform: none;
   }
 
+  .terraform-page {
+    padding: 0;
+  }
+
+  .terraform-page .code-modal {
+    border-radius: 0;
+    border: 0;
+  }
+
   .canvas-footer .keyboard-note {
     display: none;
   }
@@ -1854,12 +2080,6 @@ select:focus-visible {
     color: #6254cf;
     font-size: 8px;
     font-weight: 750;
-  }
-
-  .code-modal {
-    width: 100vw;
-    height: 100vh;
-    border-radius: 0;
   }
 
   .code-workspace {
@@ -1912,9 +2132,15 @@ select:focus-visible {
     padding: 10px;
   }
 
-  .canvas-toolbar button:first-child {
-    font-size: 0;
-    min-width: 32px;
+  .canvas-toolbar .tool-copy {
+    display: none;
+  }
+
+  .canvas-toolbar .hand-tool-button,
+  .canvas-toolbar .connection-tool-button {
+    min-width: 40px;
+    width: 40px;
+    padding: 0 8px;
   }
 
   .canvas-toolbar .connector-icon {

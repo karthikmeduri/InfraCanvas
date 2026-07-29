@@ -566,6 +566,10 @@ export default function Home() {
   const [zoom, setZoom] = useState(1);
   const [connectMode, setConnectMode] = useState(false);
   const [connectionStart, setConnectionStart] = useState<string | null>(null);
+  const [connectionSide, setConnectionSide] = useState<"input" | "output">("output");
+  const [connectionPointer, setConnectionPointer] = useState<{ x: number; y: number } | null>(null);
+  const [handMode, setHandMode] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
@@ -579,6 +583,13 @@ export default function Home() {
     originX: number;
     originY: number;
   } | null>(null);
+  const panRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
 
   const provider = providers.find((item) => item.id === providerId) ?? providers[0];
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null;
@@ -589,6 +600,7 @@ export default function Home() {
     () => generateTerraform(provider, nodes, edges),
     [provider, nodes, edges],
   );
+  const activeWorkflowStep = providerPickerOpen ? 0 : codeOpen ? 2 : 1;
 
   const groupedServices = useMemo(() => {
     const filtered = provider.services.filter((item) =>
@@ -663,6 +675,7 @@ export default function Home() {
     setProviderId(nextId);
     loadSample(nextProvider);
     setProviderPickerOpen(false);
+    setCodeOpen(false);
     setSearch("");
     setToast(`${nextProvider.shortName} resource library loaded`);
   };
@@ -696,10 +709,10 @@ export default function Home() {
   };
 
   const onNodePointerDown = (
-    event: ReactPointerEvent<HTMLButtonElement>,
+    event: ReactPointerEvent<HTMLDivElement>,
     node: DiagramNode,
   ) => {
-    if (connectMode) return;
+    if (connectMode || handMode) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       id: node.id,
@@ -711,7 +724,7 @@ export default function Home() {
     setSelectedNodeId(node.id);
   };
 
-  const onNodePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const onNodePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const active = dragRef.current;
     if (!active || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const x = Math.max(10, active.originX + (event.clientX - active.startX) / zoom);
@@ -721,7 +734,7 @@ export default function Home() {
     );
   };
 
-  const finishNodeDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const finishNodeDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -729,17 +742,22 @@ export default function Home() {
   };
 
   const handleNodeClick = (nodeId: string) => {
+    if (handMode) return;
     if (!connectMode) {
       setSelectedNodeId(nodeId);
       return;
     }
     if (!connectionStart) {
       setConnectionStart(nodeId);
+      setConnectionSide("output");
+      const source = nodes.find((node) => node.id === nodeId);
+      if (source) setConnectionPointer({ x: source.x + 176, y: source.y + 43 });
       setToast("Choose a destination resource");
       return;
     }
     if (connectionStart === nodeId) {
       setConnectionStart(null);
+      setConnectionPointer(null);
       return;
     }
     const exists = edges.some(
@@ -759,7 +777,77 @@ export default function Home() {
       setToast("Resources connected");
     }
     setConnectionStart(null);
+    setConnectionPointer(null);
     setConnectMode(false);
+  };
+
+  const startConnectionFromPort = (nodeId: string, side: "input" | "output") => {
+    if (connectionStart && connectionStart !== nodeId) {
+      handleNodeClick(nodeId);
+      return;
+    }
+
+    const source = nodes.find((node) => node.id === nodeId);
+    if (!source) return;
+    setHandMode(false);
+    setConnectMode(true);
+    setConnectionStart(nodeId);
+    setConnectionSide(side);
+    setConnectionPointer({
+      x: side === "input" ? source.x : source.x + 176,
+      y: source.y + 43,
+    });
+    setToast("Connection started — choose another resource");
+  };
+
+  const handleConnectionPort = (
+    event: ReactPointerEvent<HTMLSpanElement>,
+    nodeId: string,
+    side: "input" | "output",
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    startConnectionFromPort(nodeId, side);
+  };
+
+  const onCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!handMode) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: event.currentTarget.scrollLeft,
+      scrollTop: event.currentTarget.scrollTop,
+    };
+    setIsPanning(true);
+  };
+
+  const onCanvasPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = event.currentTarget;
+    const activePan = panRef.current;
+    if (activePan && activePan.pointerId === event.pointerId) {
+      canvas.scrollLeft = activePan.scrollLeft - (event.clientX - activePan.startX);
+      canvas.scrollTop = activePan.scrollTop - (event.clientY - activePan.startY);
+      return;
+    }
+
+    if (connectionStart) {
+      const rect = canvas.getBoundingClientRect();
+      setConnectionPointer({
+        x: (event.clientX - rect.left + canvas.scrollLeft) / zoom,
+        y: (event.clientY - rect.top + canvas.scrollTop) / zoom,
+      });
+    }
+  };
+
+  const finishCanvasPan = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    panRef.current = null;
+    setIsPanning(false);
   };
 
   const updateSelectedNode = (key: string, value: string) => {
@@ -839,10 +927,10 @@ export default function Home() {
           <button className="ghost-button" onClick={saveProject}>
             Save project
           </button>
-          <button className="generate-button" onClick={() => setCodeOpen(true)}>
-            <span className="code-glyph" aria-hidden="true">&lt;/&gt;</span>
-            Generate Terraform
-            <span className="key-hint">⌘↵</span>
+          <button className="generate-button" onClick={() => setCodeOpen((current) => !current)}>
+            <span className="code-glyph" aria-hidden="true">{codeOpen ? "←" : "</>"}</span>
+            {codeOpen ? "Back to design" : "Generate Terraform"}
+            {!codeOpen && <span className="key-hint">⌘↵</span>}
           </button>
           <button className="avatar-button" aria-label="Open account menu">
             AD
@@ -852,24 +940,31 @@ export default function Home() {
 
       <div className="workflow-bar">
         <ol className="workflow-steps" aria-label="Builder workflow">
-          {["Provider", "Design", "Configure", "Generate"].map((label, index) => (
+          {["Provider", "Design & Configure", "Generate"].map((label, index) => (
             <li
               key={label}
-              className={index === 1 ? "active" : index === 0 ? "complete" : ""}
+              className={
+                index === activeWorkflowStep
+                  ? "active"
+                  : index < activeWorkflowStep
+                    ? "complete"
+                    : ""
+              }
             >
-              <span>{index === 0 ? "✓" : index + 1}</span>
+              <span>{index < activeWorkflowStep ? "✓" : index + 1}</span>
               {label}
             </li>
           ))}
         </ol>
         <div className="validation-status">
           <span className="status-dot" />
-          Diagram ready
+          {codeOpen ? "Terraform generated" : "Diagram ready"}
           <span>{nodes.length} resources</span>
           <span>{edges.length} connections</span>
         </div>
       </div>
 
+      {!codeOpen && (
       <section className="workspace">
         <aside className={`library-panel ${mobileLibraryOpen ? "mobile-open" : ""}`}>
           <div className="panel-heading provider-heading">
@@ -972,15 +1067,32 @@ export default function Home() {
         <div className="canvas-stage">
           <div className="canvas-toolbar" role="toolbar" aria-label="Diagram tools">
             <button
-              className={connectMode ? "selected" : ""}
+              className={`hand-tool-button ${handMode ? "selected" : ""}`}
+              onClick={() => {
+                setHandMode((current) => !current);
+                setConnectMode(false);
+                setConnectionStart(null);
+                setConnectionPointer(null);
+              }}
+              aria-pressed={handMode}
+              title="Pan around the canvas"
+            >
+              <span className="hand-icon" aria-hidden="true"><i /><i /><i /></span>
+              <span className="tool-copy"><strong>Hand</strong><small>Pan canvas</small></span>
+            </button>
+            <button
+              className={`connection-tool-button ${connectMode ? "selected" : ""}`}
               onClick={() => {
                 setConnectMode((current) => !current);
                 setConnectionStart(null);
+                setConnectionPointer(null);
+                setHandMode(false);
               }}
               aria-pressed={connectMode}
               title="Connect resources"
             >
-              <span className="connector-icon" /> Connect
+              <span className="connector-icon" aria-hidden="true"><i /><i /></span>
+              <span className="tool-copy"><strong>Connect</strong><small>Link resources</small></span>
             </button>
             <span className="toolbar-divider" />
             <button onClick={() => setZoom((value) => Math.max(0.6, value - 0.1))} aria-label="Zoom out">−</button>
@@ -1002,15 +1114,19 @@ export default function Home() {
           </div>
 
           <div
-            className={`diagram-canvas ${connectMode ? "is-connecting" : ""}`}
+            className={`diagram-canvas ${connectMode ? "is-connecting" : ""} ${handMode ? "is-hand-tool" : ""} ${isPanning ? "is-panning" : ""}`}
             ref={canvasRef}
+            onPointerDown={onCanvasPointerDown}
+            onPointerMove={onCanvasPointerMove}
+            onPointerUp={finishCanvasPan}
+            onPointerCancel={finishCanvasPan}
             onDragOver={(event) => {
               event.preventDefault();
               event.dataTransfer.dropEffect = "copy";
             }}
             onDrop={onCanvasDrop}
             onClick={(event) => {
-              if (event.target === event.currentTarget) setSelectedNodeId(null);
+              if (event.target === event.currentTarget && !handMode) setSelectedNodeId(null);
             }}
             style={{
               "--canvas-zoom": zoom,
@@ -1049,6 +1165,23 @@ export default function Home() {
                     />
                   );
                 })}
+                {connectionStart && connectionPointer && (() => {
+                  const source = nodes.find((node) => node.id === connectionStart);
+                  if (!source) return null;
+                  const x1 = connectionSide === "input" ? source.x : source.x + 176;
+                  const y1 = source.y + 43;
+                  const x2 = connectionPointer.x;
+                  const y2 = connectionPointer.y;
+                  const direction = connectionSide === "input" ? -1 : 1;
+                  const curve = Math.max(70, Math.abs(x2 - x1) * 0.4);
+                  return (
+                    <path
+                      className="pending-edge"
+                      d={`M ${x1} ${y1} C ${x1 + curve * direction} ${y1}, ${x2 - curve * direction} ${y2}, ${x2} ${y2}`}
+                      markerEnd="url(#edge-arrow)"
+                    />
+                  );
+                })()}
               </svg>
 
               {nodes.map((node) => {
@@ -1057,7 +1190,7 @@ export default function Home() {
                 const selected = selectedNodeId === node.id;
                 const connecting = connectionStart === node.id;
                 return (
-                  <button
+                  <div
                     key={node.id}
                     className={`diagram-node ${selected ? "selected" : ""} ${connecting ? "connection-start" : ""}`}
                     style={{
@@ -1070,17 +1203,59 @@ export default function Home() {
                     onPointerUp={finishNodeDrag}
                     onPointerCancel={finishNodeDrag}
                     onClick={() => handleNodeClick(node.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleNodeClick(node.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     aria-label={`${node.values.name}, ${definition.name}`}
                   >
-                    <span className="node-port input-port" />
+                    <span
+                      className="node-port input-port"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Start or finish a connection on the left side of ${node.values.name}`}
+                      title="Connect from this side"
+                      onPointerDown={(event) => handleConnectionPort(event, node.id, "input")}
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          startConnectionFromPort(node.id, "input");
+                        }
+                      }}
+                    >
+                      <i aria-hidden="true">+</i>
+                    </span>
                     <span className="node-service-icon">{definition.short}</span>
                     <span className="node-copy">
                       <strong>{node.values.name}</strong>
                       <small>{definition.name}</small>
                     </span>
                     <span className="node-status" title="Configuration ready" />
-                    <span className="node-port output-port" />
-                  </button>
+                    <span
+                      className="node-port output-port"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Start or finish a connection on the right side of ${node.values.name}`}
+                      title="Connect from this side"
+                      onPointerDown={(event) => handleConnectionPort(event, node.id, "output")}
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          startConnectionFromPort(node.id, "output");
+                        }
+                      }}
+                    >
+                      <i aria-hidden="true">+</i>
+                    </span>
+                  </div>
                 );
               })}
 
@@ -1106,7 +1281,11 @@ export default function Home() {
               <div className="connect-guidance">
                 <span />
                 {connectionStart ? "Select a destination resource" : "Select the first resource"}
-                <button onClick={() => { setConnectMode(false); setConnectionStart(null); }}>Cancel</button>
+                <button onClick={() => {
+                  setConnectMode(false);
+                  setConnectionStart(null);
+                  setConnectionPointer(null);
+                }}>Cancel</button>
               </div>
             )}
           </div>
@@ -1215,6 +1394,7 @@ export default function Home() {
           )}
         </aside>
       </section>
+      )}
 
       {providerPickerOpen && (
         <div className="modal-backdrop provider-modal-backdrop" role="presentation">
@@ -1223,7 +1403,7 @@ export default function Home() {
               <span className="brand-symbol"><i /><i /><i /></span>
               InfraCanvas
             </div>
-            <span className="step-chip">STEP 1 OF 4</span>
+            <span className="step-chip">STEP 1 OF 3</span>
             <h1 id="provider-title">Where are you building?</h1>
             <p>Choose a cloud provider. We’ll load its native services, properties, and Terraform provider automatically.</p>
             <div className="provider-grid">
@@ -1253,22 +1433,22 @@ export default function Home() {
       )}
 
       {codeOpen && (
-        <div className="modal-backdrop code-modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setCodeOpen(false);
-        }}>
-          <section className="code-modal" role="dialog" aria-modal="true" aria-labelledby="code-title">
+        <section className="terraform-page" aria-labelledby="code-title">
+          <section className="code-modal">
             <header className="code-modal-header">
               <div>
+                <button className="back-design-button" onClick={() => setCodeOpen(false)} aria-label="Return to the architecture canvas">
+                  <span aria-hidden="true">←</span>
+                </button>
                 <span className="code-modal-icon">&lt;/&gt;</span>
                 <span>
-                  <small>Generated infrastructure</small>
+                  <small>Step 3 · Generated infrastructure</small>
                   <h2 id="code-title">Terraform template</h2>
                 </span>
               </div>
               <div className="code-modal-actions">
                 <button className="ghost-button" onClick={copyTerraform}>Copy code</button>
                 <button className="download-button" onClick={downloadTerraform}>Download .tf</button>
-                <button className="close-code" onClick={() => setCodeOpen(false)} aria-label="Close Terraform preview">×</button>
               </div>
             </header>
             <div className="code-summary">
@@ -1306,7 +1486,7 @@ export default function Home() {
               <button onClick={downloadTerraform}>Download Terraform</button>
             </footer>
           </section>
-        </div>
+        </section>
       )}
 
       <div className={`toast ${toast ? "show" : ""}`} aria-live="polite">

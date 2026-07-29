@@ -23,7 +23,7 @@ InfraCanvas turns cloud architecture into editable infrastructure-as-code. Choos
 The included application is an interactive front-end prototype—not a static design:
 
 - Drag services from the provider library onto the canvas
-- Reposition resources and connect them visually
+- Reposition resources, pan large canvases with the Hand tool, and connect from either node port
 - Configure machine types, regions, database engines, storage classes, network ranges, and more
 - Generate provider-specific Terraform from the current diagram
 - Copy the generated code or download it as a `.tf` file
@@ -35,16 +35,14 @@ The included application is an interactive front-end prototype—not a static de
 ```mermaid
 flowchart LR
     A["1 · Choose provider"] --> B["2 · Compose architecture"]
-    B --> C["3 · Configure resources"]
-    C --> D["4 · Generate Terraform"]
+    B --> C["2 · Configure resources"]
+    C --> D["3 · Generate Terraform"]
     D --> E["Validate and deploy"]
 ```
 
 1. **Choose a cloud** — AWS, Azure, GCP, or OCI.
-2. **Design visually** — drag provider services to the grid and arrange the system.
-3. **Configure precisely** — select any resource and define its infrastructure values.
-4. **Connect the flow** — enable Connect mode and select the source and destination.
-5. **Generate code** — review, copy, or download the generated Terraform.
+2. **Design and configure** — drag provider services to the grid, edit infrastructure values, pan with the Hand tool, and connect nodes from either side.
+3. **Generate code** — move into the dedicated Terraform workspace to review, copy, or download the generated template.
 
 ## Supported provider libraries
 
