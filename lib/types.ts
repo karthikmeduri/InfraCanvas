@@ -11,9 +11,11 @@ export type ServiceRole =
   | "subnet"
   | "gateway"
   | "loadbalancer"
+  | "targetgroup"
   | "cdn"
   | "dns"
   | "firewall"
+  | "webfirewall"
   | "compute"
   | "container"
   | "serverless"
@@ -22,12 +24,13 @@ export type ServiceRole =
   | "cache"
   | "storage"
   | "queue"
+  | "topic"
   | "secrets"
   | "identity"
   | "monitoring"
   | "analytics";
 
-export type FieldType = "text" | "number" | "select" | "toggle";
+export type FieldType = "text" | "number" | "select" | "combo" | "toggle";
 
 export type FieldDefinition = {
   key: string;
@@ -102,7 +105,7 @@ export type EmitContext = {
     attribute: RefAttribute,
     fallback: VariableSpec,
   ) => HclValue;
-  /** True when at least one node matching `roles` is reachable from this node. */
+  /** True when at least one directly connected node matches `roles`. */
   has: (roles: ServiceRole | ServiceRole[]) => boolean;
   /** Declare an input variable and get back a `var.<name>` reference. */
   variable: (spec: VariableSpec) => HclValue;

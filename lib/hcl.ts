@@ -162,17 +162,34 @@ function renderBody(body: HclEntry[], indent: string): string {
     const entry = body[index];
 
     if (entry.kind === "attr") {
-      const run: Extract<HclEntry, { kind: "attr" }>[] = [];
+      const run: { name: string; rendered: string }[] = [];
       while (index < body.length && body[index].kind === "attr") {
-        run.push(body[index] as Extract<HclEntry, { kind: "attr" }>);
+        const item = body[index] as Extract<HclEntry, { kind: "attr" }>;
+        run.push({ name: item.name, rendered: renderValue(item.value, indent) });
         index += 1;
       }
-      const width = Math.max(...run.map((item) => item.name.length));
+
+      // `terraform fmt` aligns `=` only across consecutive single-line
+      // arguments; a multi-line value breaks the group on both sides.
+      let group: typeof run = [];
+      const flush = () => {
+        if (group.length === 0) return;
+        const width = Math.max(...group.map((item) => item.name.length));
+        group.forEach((item) => {
+          lines.push(`${indent}${item.name.padEnd(width)} = ${item.rendered}`);
+        });
+        group = [];
+      };
+
       run.forEach((item) => {
-        lines.push(
-          `${indent}${item.name.padEnd(width)} = ${renderValue(item.value, indent)}`,
-        );
+        if (item.rendered.includes("\n")) {
+          flush();
+          lines.push(`${indent}${item.name} = ${item.rendered}`);
+          return;
+        }
+        group.push(item);
       });
+      flush();
       continue;
     }
 
@@ -215,10 +232,16 @@ export function expr(value: HclValue): string {
 export function render(entries: HclEntry[]): string {
   const chunks: string[] = [];
 
-  entries.forEach((entry) => {
+  entries.forEach((entry, index) => {
     if (entry.kind === "blank") {
       chunks.push("");
       return;
+    }
+    // Separate consecutive top-level blocks so the document reads like
+    // hand-written Terraform rather than one dense wall.
+    const previous = entries[index - 1];
+    if (previous && previous.kind === "block" && entry.kind === "block") {
+      chunks.push("");
     }
     chunks.push(renderBody([entry], ""));
   });

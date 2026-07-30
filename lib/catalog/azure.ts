@@ -454,6 +454,10 @@ export const azure: ProviderDefinition = {
         toggle("private_cluster", "Private cluster", true),
       ],
       emit: (c) => {
+        c.data(
+          "azurerm_client_config",
+          block("data", ["azurerm_client_config", "current"], []),
+        );
         c.output({
           name: `${c.name}_fqdn`,
           value: raw(`azurerm_kubernetes_cluster.${c.name}.fqdn`),
@@ -483,6 +487,9 @@ export const azure: ProviderDefinition = {
             ]),
             block("azure_active_directory_role_based_access_control", [], [
               attr("azure_rbac_enabled", bool(true)),
+              // The provider requires a tenant or an admin group; the tenant of
+              // the authenticated principal is the safe default.
+              attr("tenant_id", raw("data.azurerm_client_config.current.tenant_id")),
             ]),
             attr("tags", c.tags),
           ]),
@@ -794,7 +801,7 @@ export const azure: ProviderDefinition = {
             attr("sku_name", str(c.v.sku || "standard")),
             attr("purge_protection_enabled", bool(true)),
             attr("soft_delete_retention_days", num(c.v.retention_days, 30)),
-            attr("enable_rbac_authorization", bool(true)),
+            attr("rbac_authorization_enabled", bool(true)),
             attr("public_network_access_enabled", bool(false)),
             block("network_acls", [], [
               attr("bypass", str("AzureServices")),

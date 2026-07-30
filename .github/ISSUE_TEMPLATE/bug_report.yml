@@ -1,0 +1,42 @@
+name: Bug report
+description: Something in the builder or the generated Terraform is wrong
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where is the problem?
+      options:
+        - Generated Terraform is invalid or wrong
+        - Canvas or builder interaction
+        - Validation panel
+        - Export (zip, SVG, PNG)
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: >
+        For Terraform problems, please paste the `terraform validate` or
+        `terraform plan` output and the relevant resource block.
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagram
+    attributes:
+      label: Diagram that reproduces it
+      description: >
+        Which services, and which connections between them? A screenshot or the
+        SVG export is ideal.
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and OS
+      placeholder: Chrome 141 on Windows 11

@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The generator suite gates on `fmt -check`, so the toolchain has to be
+      # present for the check that matters most.
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.9.0
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm test
+
+  validate-terraform:
+    name: tofu validate generated modules
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [aws, azure, gcp, oci]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.9.0
+
+      - run: npm ci
+
+      # Emit the full catalog for this provider, then validate it against the
+      # real downloaded provider schema.
+      - run: npm run emit:terraform -- ${{ matrix.provider }}
+
+      - name: Validate
+        working-directory: dist/emitted/${{ matrix.provider }}
+        run: |
+          tofu init -backend=false -input=false
+          tofu validate

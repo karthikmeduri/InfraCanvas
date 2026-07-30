@@ -13,7 +13,7 @@ import {
   str,
 } from "../hcl";
 import type { ProviderDefinition, VariableSpec } from "../types";
-import { defineService, number, select, text, toggle } from "./helpers";
+import { combo, defineService, number, select, text, toggle } from "./helpers";
 
 const REGIONS = [
   "us-east-1",
@@ -26,6 +26,31 @@ const REGIONS = [
   "ap-northeast-1",
   "sa-east-1",
 ];
+
+/**
+ * Curated current-generation choices spanning every AWS EC2 workload category.
+ * The combobox also accepts any region-supported value because AWS adds sizes
+ * continuously and availability differs by region and account.
+ */
+const EC2_INSTANCE_TYPES = [
+  "t3.nano", "t3.micro", "t3.small", "t3.medium", "t3.large", "t3.xlarge", "t3.2xlarge",
+  "t3a.micro", "t3a.small", "t3a.medium", "t3a.large", "t4g.micro", "t4g.small", "t4g.medium", "t4g.large",
+  "m7i-flex.large", "m7i-flex.xlarge", "m7i-flex.2xlarge", "m7i.large", "m7i.xlarge", "m7a.large",
+  "m7g.large", "m8g.large", "m8i.large", "m6id.large",
+  "c7i-flex.large", "c7i.large", "c7a.large", "c7g.large", "c7gn.xlarge", "c8g.large", "c8i.large", "c8id.large",
+  "r7i.large", "r7a.large", "r7g.large", "r8g.large", "r8i.large", "r8id.large", "x2idn.16xlarge", "u7i-6tb.112xlarge",
+  "i4i.large", "i4g.large", "i7i.large", "i8g.large", "i8ge.large", "im4gn.large", "is4gen.medium", "d3en.xlarge",
+  "g5.xlarge", "g6.xlarge", "g6e.xlarge", "p5.48xlarge", "p5e.48xlarge", "inf2.xlarge", "trn1.2xlarge",
+  "trn2.48xlarge", "f2.6xlarge", "vt1.3xlarge",
+  "hpc7g.4xlarge", "hpc7a.12xlarge", "hpc8a.96xlarge",
+];
+
+const EKS_NODE_TYPES = EC2_INSTANCE_TYPES.filter(
+  (value) => !/^(mac|u7|f2|hpc|d3|p5)/.test(value),
+);
+
+const isArmInstanceType = (value: string) =>
+  /^(t4g|[mcr][678]g|c7gn|i4g|i8g|i8ge|im4gn|is4gen|hpc7g)\./.test(value);
 
 const VPC_VAR: VariableSpec = {
   name: "vpc_id",
@@ -51,6 +76,12 @@ const SG_VAR: VariableSpec = {
   type: "list(string)",
   description: "Security group ids applied when no security group is connected in the diagram.",
   default: listOf([]),
+};
+
+const TARGET_GROUP_VAR: VariableSpec = {
+  name: "target_group_arn",
+  type: "string",
+  description: "Existing load balancer target group ARN used when no target group is connected.",
 };
 
 export const aws: ProviderDefinition = {
@@ -188,6 +219,8 @@ export const aws: ProviderDefinition = {
         select("scheme", "Scheme", ["internet-facing", "internal"]),
         select("protocol", "Listener protocol", ["HTTPS", "HTTP"]),
         number("port", "Listener port", "443"),
+        select("target_protocol", "Default target protocol", ["HTTP", "HTTPS"]),
+        number("target_port", "Default target port", "8080"),
         text("health_check_path", "Health check path", "/health"),
         toggle("deletion_protection", "Deletion protection", false),
       ],
@@ -204,6 +237,10 @@ export const aws: ProviderDefinition = {
           description: `Public DNS name of ${c.display}`,
         });
         const isHttps = (c.v.protocol || "HTTPS") === "HTTPS";
+        const hasExplicitTargetGroup = c.has("targetgroup");
+        const targetGroupArn = hasExplicitTargetGroup
+          ? c.ref("targetgroup", "arn", TARGET_GROUP_VAR)
+          : raw(`aws_lb_target_group.${c.name}.arn`);
         return [
           resource("aws_lb", c.name, [
             attr("name", str(dnsName(c.display, "app-lb", 32))),
@@ -215,20 +252,24 @@ export const aws: ProviderDefinition = {
             attr("enable_deletion_protection", flag(c.v.deletion_protection, false)),
             attr("tags", c.tags),
           ]),
-          resource("aws_lb_target_group", c.name, [
-            attr("name", str(dnsName(`${c.display}-tg`, "app-tg", 32))),
-            attr("port", num(c.v.port, 443)),
-            attr("protocol", str(isHttps ? "HTTPS" : "HTTP")),
-            attr("target_type", str("instance")),
-            attr("vpc_id", c.ref("network", "id", VPC_VAR)),
-            block("health_check", [], [
-              attr("path", str(c.v.health_check_path || "/health")),
-              attr("matcher", str("200-399")),
-              attr("healthy_threshold", num(2, 2)),
-              attr("unhealthy_threshold", num(3, 3)),
-            ]),
-            attr("tags", c.tags),
-          ]),
+          ...(!hasExplicitTargetGroup
+            ? [
+                resource("aws_lb_target_group", c.name, [
+                  attr("name", str(dnsName(`${c.display}-tg`, "app-tg", 32))),
+                  attr("port", num(c.v.target_port, 8080)),
+                  attr("protocol", str(c.v.target_protocol || "HTTP")),
+                  attr("target_type", str("instance")),
+                  attr("vpc_id", c.ref("network", "id", VPC_VAR)),
+                  block("health_check", [], [
+                    attr("path", str(c.v.health_check_path || "/health")),
+                    attr("matcher", str("200-399")),
+                    attr("healthy_threshold", num(2, 2)),
+                    attr("unhealthy_threshold", num(3, 3)),
+                  ]),
+                  attr("tags", c.tags),
+                ]),
+              ]
+            : []),
           resource("aws_lb_listener", c.name, [
             attr("load_balancer_arn", raw(`aws_lb.${c.name}.arn`)),
             attr("port", num(c.v.port, 443)),
@@ -241,7 +282,67 @@ export const aws: ProviderDefinition = {
               : []),
             block("default_action", [], [
               attr("type", str("forward")),
-              attr("target_group_arn", raw(`aws_lb_target_group.${c.name}.arn`)),
+              attr("target_group_arn", targetGroupArn),
+            ]),
+            attr("tags", c.tags),
+          ]),
+        ];
+      },
+    }),
+    defineService({
+      id: "target_group",
+      name: "Load Balancer Target Group",
+      short: "TG",
+      category: "Networking",
+      role: "targetgroup",
+      tfType: "aws_lb_target_group",
+      description: "Healthy backend registration and request routing",
+      docs: "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lb_target_group",
+      fields: [
+        select("target_type", "Target type", ["instance", "ip", "lambda"]),
+        select("protocol", "Target protocol", ["HTTP", "HTTPS"]),
+        number("port", "Target port", "8080"),
+        select("protocol_version", "Protocol version", ["HTTP1", "HTTP2", "GRPC"]),
+        select("ip_address_type", "IP address type", ["ipv4", "ipv6"]),
+        text("health_check_path", "Health check path", "/health"),
+        number("health_check_interval", "Health check interval (seconds)", "30"),
+        number("health_check_timeout", "Health check timeout (seconds)", "5"),
+        number("healthy_threshold", "Healthy threshold", "2"),
+        number("unhealthy_threshold", "Unhealthy threshold", "3"),
+        text("success_codes", "Success codes", "200-399"),
+        number("deregistration_delay", "Deregistration delay (seconds)", "30"),
+      ],
+      emit: (c) => {
+        const isLambda = c.v.target_type === "lambda";
+        const isGrpc = c.v.protocol_version === "GRPC";
+        return [
+          resource("aws_lb_target_group", c.name, [
+            attr("name", str(dnsName(c.display, "app-targets", 32))),
+            ...(isLambda
+              ? []
+              : [
+                  attr("port", num(c.v.port, 8080)),
+                  attr("protocol", str(c.v.protocol || "HTTP")),
+                  attr("protocol_version", str(c.v.protocol_version || "HTTP1")),
+                  attr("ip_address_type", str(c.v.ip_address_type || "ipv4")),
+                  attr("vpc_id", c.ref("network", "id", VPC_VAR)),
+                ]),
+            attr("target_type", str(c.v.target_type || "instance")),
+            attr("deregistration_delay", num(c.v.deregistration_delay, 30)),
+            block("health_check", [], [
+              attr("enabled", bool(true)),
+              ...(!isLambda
+                ? [
+                    attr("path", str(c.v.health_check_path || "/health")),
+                    attr("protocol", str(c.v.protocol || "HTTP")),
+                    attr("port", str("traffic-port")),
+                  ]
+                : []),
+              attr("matcher", str(c.v.success_codes || (isGrpc ? "12" : "200-399"))),
+              attr("interval", num(c.v.health_check_interval, isLambda ? 35 : 30)),
+              attr("timeout", num(c.v.health_check_timeout, isLambda ? 30 : 5)),
+              attr("healthy_threshold", num(c.v.healthy_threshold, 2)),
+              attr("unhealthy_threshold", num(c.v.unhealthy_threshold, 3)),
             ]),
             attr("tags", c.tags),
           ]),
@@ -429,29 +530,25 @@ export const aws: ProviderDefinition = {
       description: "Resizable virtual machine",
       docs: "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance",
       fields: [
-        select("instance_type", "Machine type", [
-          "t3.micro",
-          "t3.small",
-          "t3.medium",
-          "t3.large",
-          "m6i.large",
-          "m6i.xlarge",
-          "c7g.large",
-          "r6i.large",
-          "g5.xlarge",
-        ]),
+        combo(
+          "instance_type",
+          "Machine type",
+          EC2_INSTANCE_TYPES,
+          "Suggestions cover every EC2 category. You can enter any instance type available in your selected region.",
+        ),
         select("os", "Operating system", ["Amazon Linux 2023", "Ubuntu 24.04 LTS"]),
         number("count", "Instance count", "2"),
         number("root_volume_size", "Root volume (GB)", "20"),
-        select("volume_type", "Volume type", ["gp3", "gp2", "io2"]),
+        select("volume_type", "Volume type", ["gp3", "io2", "io1", "gp2", "st1", "sc1"]),
         toggle("monitoring", "Detailed monitoring", true),
       ],
       emit: (c) => {
         const isUbuntu = c.v.os === "Ubuntu 24.04 LTS";
+        const isArm = isArmInstanceType(c.v.instance_type || "t3.micro");
         const amiData = isUbuntu ? "ubuntu" : "amazon_linux";
         c.data(
-          `ami_${amiData}`,
-          block("data", ["aws_ami", amiData], [
+          `ami_${amiData}_${isArm ? "arm64" : "x86_64"}`,
+          block("data", ["aws_ami", `${amiData}_${isArm ? "arm64" : "x86_64"}`], [
             attr("most_recent", bool(true)),
             attr("owners", list(str(isUbuntu ? "099720109477" : "amazon"))),
             block("filter", [], [
@@ -461,8 +558,8 @@ export const aws: ProviderDefinition = {
                 list(
                   str(
                     isUbuntu
-                      ? "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
-                      : "al2023-ami-2023.*-x86_64",
+                      ? `ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-${isArm ? "arm64" : "amd64"}-server-*`
+                      : `al2023-ami-2023.*-${isArm ? "arm64" : "x86_64"}`,
                   ),
                 ),
               ),
@@ -483,7 +580,7 @@ export const aws: ProviderDefinition = {
         const entries = [
           resource("aws_instance", c.name, [
             ...(multiple ? [attr("count", num(instanceCount, 1))] : []),
-            attr("ami", raw(`data.aws_ami.${amiData}.id`)),
+            attr("ami", raw(`data.aws_ami.${amiData}_${isArm ? "arm64" : "x86_64"}.id`)),
             attr("instance_type", str(c.v.instance_type || "t3.micro")),
             attr(
               "subnet_id",
@@ -518,27 +615,39 @@ export const aws: ProviderDefinition = {
         ];
 
         // Register the instance with a load balancer when the diagram connects one.
-        if (c.has("loadbalancer")) {
+        if (c.has(["targetgroup", "loadbalancer"])) {
+          const targetRole = c.has("targetgroup") ? "targetgroup" : "loadbalancer";
           entries.push(
             resource("aws_lb_target_group_attachment", c.name, [
               ...(multiple ? [attr("count", num(instanceCount, 1))] : []),
               attr(
                 "target_group_arn",
                 c.ref(
-                  "loadbalancer",
-                  (targetRef) => `aws_lb_target_group.${targetRef.name}.arn`,
-                  {
-                    name: "target_group_arn",
-                    type: "string",
-                    description: "Target group the instances register with.",
-                  },
+                  targetRole,
+                  (targetRef) =>
+                    targetRef.tfType === "aws_lb_target_group"
+                      ? `aws_lb_target_group.${targetRef.name}.arn`
+                      : `aws_lb_target_group.${targetRef.name}.arn`,
+                  TARGET_GROUP_VAR,
                 ),
               ),
               attr(
                 "target_id",
                 raw(multiple ? `aws_instance.${c.name}[count.index].id` : `aws_instance.${c.name}.id`),
               ),
-              attr("port", num(80, 80)),
+              attr(
+                "port",
+                c.ref(
+                  targetRole,
+                  (targetRef) => targetRef.values.port || targetRef.values.target_port || "8080",
+                  {
+                    name: "target_group_port",
+                    type: "number",
+                    description: "Port used to register instances with the target group.",
+                    default: num(8080, 8080),
+                  },
+                ),
+              ),
             ]),
           );
         }
@@ -555,27 +664,34 @@ export const aws: ProviderDefinition = {
       tfType: "aws_autoscaling_group",
       description: "Self-healing, horizontally scaled fleet",
       fields: [
-        select("instance_type", "Machine type", ["t3.small", "t3.medium", "m6i.large", "c7g.large"]),
+        combo(
+          "instance_type",
+          "Machine type",
+          EKS_NODE_TYPES,
+          "Choose a current recommendation or enter any launch-template-compatible EC2 type.",
+        ),
         number("min_size", "Minimum instances", "2"),
         number("max_size", "Maximum instances", "6"),
         number("target_cpu", "Target CPU %", "60"),
       ],
       emit: (c) => {
+        const isArm = isArmInstanceType(c.v.instance_type || "t3.small");
+        const amiName = `amazon_linux_${isArm ? "arm64" : "x86_64"}`;
         c.data(
-          "ami_amazon_linux",
-          block("data", ["aws_ami", "amazon_linux"], [
+          `ami_${amiName}`,
+          block("data", ["aws_ami", amiName], [
             attr("most_recent", bool(true)),
             attr("owners", list(str("amazon"))),
             block("filter", [], [
               attr("name", str("name")),
-              attr("values", list(str("al2023-ami-2023.*-x86_64"))),
+              attr("values", list(str(`al2023-ami-2023.*-${isArm ? "arm64" : "x86_64"}`))),
             ]),
           ]),
         );
         return [
           resource("aws_launch_template", c.name, [
             attr("name_prefix", str(`${dnsName(c.display, "app", 40)}-`)),
-            attr("image_id", raw("data.aws_ami.amazon_linux.id")),
+            attr("image_id", raw(`data.aws_ami.${amiName}.id`)),
             attr("instance_type", str(c.v.instance_type || "t3.small")),
             attr("vpc_security_group_ids", c.refList("firewall", "id", SG_VAR)),
             block("metadata_options", [], [
@@ -596,19 +712,15 @@ export const aws: ProviderDefinition = {
             attr("vpc_zone_identifier", c.refList("subnet", "id", SUBNETS_VAR)),
             attr("health_check_type", str("ELB")),
             attr("health_check_grace_period", num(300, 300)),
-            ...(c.has("loadbalancer")
+            ...(c.has(["targetgroup", "loadbalancer"])
               ? [
                   attr(
                     "target_group_arns",
                     listOf([
                       c.ref(
-                        "loadbalancer",
+                        c.has("targetgroup") ? "targetgroup" : "loadbalancer",
                         (targetRef) => `aws_lb_target_group.${targetRef.name}.arn`,
-                        {
-                          name: "target_group_arn",
-                          type: "string",
-                          description: "Target group the fleet registers with.",
-                        },
+                        TARGET_GROUP_VAR,
                       ),
                     ]),
                   ),
@@ -810,19 +922,15 @@ export const aws: ProviderDefinition = {
             attr("security_groups", c.refList("firewall", "id", SG_VAR)),
             attr("assign_public_ip", bool(false)),
           ]),
-          ...(c.has("loadbalancer")
+          ...(c.has(["targetgroup", "loadbalancer"])
             ? [
                 block("load_balancer", [], [
                   attr(
                     "target_group_arn",
                     c.ref(
-                      "loadbalancer",
+                      c.has("targetgroup") ? "targetgroup" : "loadbalancer",
                       (targetRef) => `aws_lb_target_group.${targetRef.name}.arn`,
-                      {
-                        name: "target_group_arn",
-                        type: "string",
-                        description: "Target group the service registers with.",
-                      },
+                      TARGET_GROUP_VAR,
                     ),
                   ),
                   attr("container_name", str("app")),
@@ -843,8 +951,16 @@ export const aws: ProviderDefinition = {
       tfType: "aws_eks_cluster",
       description: "Managed Kubernetes control plane",
       fields: [
-        select("version", "Kubernetes version", ["1.33", "1.32", "1.31"]),
-        select("node_type", "Node machine type", ["t3.medium", "t3.large", "m6i.large", "c7g.large"]),
+        select("version", "Kubernetes version", ["1.36", "1.35", "1.34", "1.33", "1.32", "1.31"]),
+        combo(
+          "node_type",
+          "Node machine type",
+          EKS_NODE_TYPES,
+          "Includes general, compute, memory, storage, and accelerated families; custom region-supported values are accepted.",
+        ),
+        select("node_os", "Managed node operating system", ["AL2023", "Bottlerocket"]),
+        select("capacity_type", "Capacity type", ["ON_DEMAND", "SPOT"]),
+        number("disk_size", "Node disk size (GB)", "40"),
         number("desired_nodes", "Desired nodes", "2"),
         number("max_nodes", "Maximum nodes", "4"),
         toggle("public_endpoint", "Public API endpoint", false),
@@ -899,9 +1015,14 @@ export const aws: ProviderDefinition = {
           resource("aws_eks_cluster", c.name, [
             attr("name", str(dnsName(c.display, "eks-cluster", 60))),
             attr("role_arn", raw(`aws_iam_role.${c.name}_cluster.arn`)),
-            attr("version", str(c.v.version || "1.33")),
+            attr("version", str(c.v.version || "1.36")),
+            attr(
+              "enabled_cluster_log_types",
+              list(str("api"), str("audit"), str("authenticator"), str("controllerManager"), str("scheduler")),
+            ),
             block("vpc_config", [], [
               attr("subnet_ids", c.refList("subnet", "id", SUBNETS_VAR)),
+              attr("security_group_ids", c.refList("firewall", "id", SG_VAR)),
               attr("endpoint_private_access", bool(true)),
               attr("endpoint_public_access", flag(c.v.public_endpoint, false)),
             ]),
@@ -914,6 +1035,20 @@ export const aws: ProviderDefinition = {
             attr("node_role_arn", raw(`aws_iam_role.${c.name}_node.arn`)),
             attr("subnet_ids", c.refList("subnet", "id", SUBNETS_VAR)),
             attr("instance_types", list(str(c.v.node_type || "t3.medium"))),
+            attr("capacity_type", str(c.v.capacity_type || "ON_DEMAND")),
+            attr(
+              "ami_type",
+              str(
+                c.v.node_os === "Bottlerocket"
+                  ? isArmInstanceType(c.v.node_type || "t3.medium")
+                    ? "BOTTLEROCKET_ARM_64"
+                    : "BOTTLEROCKET_x86_64"
+                  : isArmInstanceType(c.v.node_type || "t3.medium")
+                    ? "AL2023_ARM_64_STANDARD"
+                    : "AL2023_x86_64_STANDARD",
+              ),
+            ),
+            attr("disk_size", num(c.v.disk_size, 40)),
             block("scaling_config", [], [
               attr("desired_size", num(c.v.desired_nodes, 2)),
               attr("min_size", num(1, 1)),
@@ -963,17 +1098,29 @@ export const aws: ProviderDefinition = {
       docs: "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance",
       fields: [
         select("engine", "Engine", ["postgres", "mysql", "mariadb"]),
-        select("engine_version", "Engine version", ["16.4", "15.8", "8.0.39"]),
-        select("instance_class", "Instance class", [
-          "db.t4g.micro",
-          "db.t4g.small",
-          "db.t4g.medium",
-          "db.m6g.large",
-          "db.r6g.large",
-        ]),
+        combo(
+          "engine_version",
+          "Engine version",
+          ["17.5", "16.9", "15.13", "14.18", "8.4.5", "8.0.42", "11.8.3"],
+          "Choose a suggested version or enter a version supported by the selected engine and region.",
+        ),
+        combo(
+          "instance_class",
+          "Instance class",
+          [
+            "db.t4g.micro", "db.t4g.small", "db.t4g.medium", "db.t4g.large",
+            "db.t3.micro", "db.t3.small", "db.m7g.large", "db.m7i.large",
+            "db.m6g.large", "db.m6i.large", "db.r7g.large", "db.r7i.large",
+            "db.r6g.large", "db.x2g.large", "db.z1d.large",
+          ],
+          "Custom DB classes are accepted because engine and region availability varies.",
+        ),
         number("storage", "Allocated storage (GB)", "20"),
+        select("storage_type", "Storage type", ["gp3", "io2", "io1", "gp2"]),
         toggle("multi_az", "Multi-AZ high availability", false),
         number("backup_retention", "Backup retention (days)", "7"),
+        toggle("deletion_protection", "Deletion protection", true),
+        toggle("performance_insights", "Performance Insights", true),
       ],
       emit: (c) => {
         const username = c.variable({
@@ -1011,17 +1158,18 @@ export const aws: ProviderDefinition = {
             attr("engine_version", str(c.v.engine_version || "16.4")),
             attr("instance_class", str(c.v.instance_class || "db.t4g.micro")),
             attr("allocated_storage", num(c.v.storage, 20)),
-            attr("storage_type", str("gp3")),
+            attr("storage_type", str(c.v.storage_type || "gp3")),
             attr("storage_encrypted", bool(true)),
+            attr("publicly_accessible", bool(false)),
             attr("multi_az", flag(c.v.multi_az, false)),
             attr("db_subnet_group_name", raw(`aws_db_subnet_group.${c.name}.name`)),
             attr("vpc_security_group_ids", c.refList("firewall", "id", SG_VAR)),
             attr("username", username),
             attr("password", password),
             attr("backup_retention_period", num(c.v.backup_retention, 7)),
-            attr("deletion_protection", bool(true)),
+            attr("deletion_protection", flag(c.v.deletion_protection, true)),
             attr("auto_minor_version_upgrade", bool(true)),
-            attr("performance_insights_enabled", bool(true)),
+            attr("performance_insights_enabled", flag(c.v.performance_insights, true)),
             attr("skip_final_snapshot", bool(false)),
             attr("final_snapshot_identifier", str(dnsName(`${c.display}-final`, "db-final", 60))),
             attr("tags", c.tags),
@@ -1081,7 +1229,15 @@ export const aws: ProviderDefinition = {
       tfType: "aws_elasticache_replication_group",
       description: "In-memory cache and session store",
       fields: [
-        select("node_type", "Node type", ["cache.t4g.micro", "cache.t4g.small", "cache.r7g.large"]),
+        combo(
+          "node_type",
+          "Node type",
+          [
+            "cache.t4g.micro", "cache.t4g.small", "cache.t4g.medium", "cache.m7g.large",
+            "cache.m6g.large", "cache.r7g.large", "cache.r6g.large",
+          ],
+          "Choose a current recommendation or enter any cache node type supported in the region.",
+        ),
         number("replicas", "Replica count", "1"),
         select("engine_version", "Engine version", ["7.1", "7.0"]),
       ],
@@ -1242,7 +1398,7 @@ export const aws: ProviderDefinition = {
       name: "Web Application Firewall",
       short: "WAF",
       category: "Security",
-      role: "firewall",
+      role: "webfirewall",
       tfType: "aws_wafv2_web_acl",
       description: "Managed request filtering rules",
       fields: [
@@ -1252,7 +1408,7 @@ export const aws: ProviderDefinition = {
       ],
       emit: (c) => {
         const metricName = dnsName(c.display, "web-acl", 60).replace(/-/g, "");
-        return [
+        const entries = [
           resource("aws_wafv2_web_acl", c.name, [
             attr("name", str(dnsName(c.display, "web-acl", 60))),
             attr("scope", str(c.v.scope || "REGIONAL")),
@@ -1299,6 +1455,19 @@ export const aws: ProviderDefinition = {
             attr("tags", c.tags),
           ]),
         ];
+        if ((c.v.scope || "REGIONAL") === "REGIONAL" && c.has("loadbalancer")) {
+          entries.push(
+            resource("aws_wafv2_web_acl_association", c.name, [
+              attr("resource_arn", c.ref("loadbalancer", "arn", {
+                name: "waf_resource_arn",
+                type: "string",
+                description: "Regional load balancer ARN protected by the web ACL.",
+              })),
+              attr("web_acl_arn", raw(`aws_wafv2_web_acl.${c.name}.arn`)),
+            ]),
+          );
+        }
+        return entries;
       },
     }),
     defineService({
@@ -1468,7 +1637,7 @@ export const aws: ProviderDefinition = {
       name: "SNS Topic",
       short: "SNS",
       category: "Integration",
-      role: "queue",
+      role: "topic",
       tfType: "aws_sns_topic",
       description: "Pub/sub fan-out messaging",
       fields: [toggle("fifo", "FIFO topic", false)],
@@ -1518,7 +1687,7 @@ export const aws: ProviderDefinition = {
           attr("treat_missing_data", str("notBreaching")),
           attr(
             "alarm_actions",
-            c.refList("queue", "arn", {
+            c.refList("topic", "arn", {
               name: "alarm_notification_arns",
               type: "list(string)",
               description: "SNS topic ARNs notified when an alarm fires.",

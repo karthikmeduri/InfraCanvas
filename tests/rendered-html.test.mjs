@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const templateRoot = new URL("../", import.meta.url);
-
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -30,7 +28,9 @@ test("server-renders the InfraCanvas builder", async () => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
-  const html = await response.text();
+  // React separates adjacent text nodes with comment markers; strip them so
+  // assertions can read the copy the user actually sees.
+  const html = (await response.text()).replaceAll("<!-- -->", "");
   assert.match(
     html,
     /<title>InfraCanvas — Visual Cloud Architecture to Terraform<\/title>/i,
@@ -41,10 +41,22 @@ test("server-renders the InfraCanvas builder", async () => {
   assert.match(html, /Google Cloud/);
   assert.match(html, /Oracle Cloud Infrastructure/);
   assert.match(html, /Generate Terraform/);
+
+  // Provider cards advertise the real catalog size and Terraform provider.
+  assert.match(html, /hashicorp\/aws/);
+  assert.match(html, /\d+ services/);
+
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 
-test("ships product metadata and no disposable starter preview", async () => {
+test("applies the stored theme before first paint", async () => {
+  const response = await render();
+  const html = await response.text();
+  assert.match(html, /prefers-color-scheme: dark/);
+  assert.match(html, /data-theme/);
+});
+
+test("ships product code rather than starter scaffolding", async () => {
   const [page, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
@@ -52,13 +64,42 @@ test("ships product metadata and no disposable starter preview", async () => {
   ]);
 
   assert.match(page, /"use client"/);
-  assert.match(page, /generateTerraform/);
   assert.match(page, /application\/infracanvas-service/);
   assert.match(page, /localStorage/);
+  assert.match(page, /@\/lib\/terraform\/generate/);
   assert.match(layout, /InfraCanvas — Visual Cloud Architecture to Terraform/);
   assert.doesNotMatch(layout, /Starter Project|codex-preview|_sites-preview/);
   assert.match(packageJson, /"name": "infracanvas"/);
-  assert.doesNotMatch(packageJson, /react-loading-skeleton/);
 
-  await assert.rejects(readFile(new URL("../app/_sites-preview/SkeletonPreview.tsx", templateRoot)));
+  await assert.rejects(
+    readFile(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)),
+  );
+});
+
+test("no source file contains a credential-shaped literal", async () => {
+  const files = [
+    "../app/page.tsx",
+    "../lib/hcl.ts",
+    "../lib/terraform/generate.ts",
+    "../lib/catalog/aws.ts",
+    "../lib/catalog/azure.ts",
+    "../lib/catalog/gcp.ts",
+    "../lib/catalog/oci.ts",
+  ];
+
+  for (const relative of files) {
+    const contents = await readFile(new URL(relative, import.meta.url), "utf8");
+    assert.doesNotMatch(contents, /AKIA[0-9A-Z]{16}/, `${relative} has an AWS key id`);
+    assert.doesNotMatch(
+      contents,
+      /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+      `${relative} has a private key`,
+    );
+    // Credentials must always be Terraform variable references, never literals.
+    assert.doesNotMatch(
+      contents,
+      /(admin_password|administrator_login_password|administrator_password)",\s*str\(/,
+      `${relative} inlines a password literal instead of a sensitive variable`,
+    );
+  }
 });

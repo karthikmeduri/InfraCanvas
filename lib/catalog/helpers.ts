@@ -8,6 +8,14 @@ export const select = (
   hint?: string,
 ): FieldDefinition => ({ key, label, type: "select", options, hint });
 
+/** Suggested values with a free-text escape hatch for fast-changing cloud catalogs. */
+export const combo = (
+  key: string,
+  label: string,
+  options: string[],
+  hint?: string,
+): FieldDefinition => ({ key, label, type: "combo", options, hint });
+
 /** Free-text field. */
 export const text = (
   key: string,

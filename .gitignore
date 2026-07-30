@@ -41,3 +41,14 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# terraform — state can contain secrets in plaintext
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+*.tfplan
+
+# editor and agent tooling
+/.claude/

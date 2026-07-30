@@ -1,0 +1,49 @@
+name: Request a cloud service
+description: Ask for a service that is missing from a provider's catalog
+title: "[service] "
+labels: ["service-request"]
+body:
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options:
+        - AWS
+        - Azure
+        - Google Cloud
+        - Oracle Cloud
+    validations:
+      required: true
+
+  - type: input
+    id: resource
+    attributes:
+      label: Terraform resource type
+      description: The primary resource this service should emit.
+      placeholder: aws_msk_cluster
+    validations:
+      required: true
+
+  - type: textarea
+    id: properties
+    attributes:
+      label: Properties worth exposing in the inspector
+      description: >
+        Which settings should a user be able to pick on the canvas? Include the
+        realistic option lists where they are a fixed set.
+      placeholder: |
+        - Instance type: kafka.m5.large, kafka.m5.xlarge
+        - Broker count: number
+        - Encryption in transit: toggle, default on
+    validations:
+      required: true
+
+  - type: textarea
+    id: connections
+    attributes:
+      label: What should it connect to?
+      description: >
+        Which references should be resolved from diagram edges — subnet, security
+        group, network, load balancer?
+    validations:
+      required: true

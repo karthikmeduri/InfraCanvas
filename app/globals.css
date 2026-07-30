@@ -334,6 +334,7 @@ select:focus-visible {
 
 .workspace {
   height: calc(100vh - 108px);
+  min-height: 0;
   display: grid;
   grid-template-columns: 282px minmax(460px, 1fr) 310px;
 }
@@ -350,6 +351,8 @@ select:focus-visible {
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .inspector-panel {
@@ -506,7 +509,10 @@ select:focus-visible {
 
 .service-library {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 0 9px 10px;
 }
 
@@ -627,6 +633,7 @@ select:focus-visible {
 
 .library-tip {
   margin: 8px 12px 12px;
+  flex: 0 0 auto;
   display: flex;
   gap: 9px;
   align-items: flex-start;

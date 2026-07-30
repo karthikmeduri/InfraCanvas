@@ -256,7 +256,8 @@ export function generate(
       v: item.node.values,
       tags: raw("local.tags"),
       connected: (graph.neighbours.get(item.node.id) ?? []).length > 0,
-      has: (roles) => reachableMatches(roles).length > 0,
+      has: (roles) =>
+        graph.findByRole(item.node.id, rolesOf(roles)).some((match) => match.distance === 1),
       variable: declareVariable,
       output: (spec) => outputs.push(spec),
       data: (key, entry) => {
@@ -275,8 +276,13 @@ export function generate(
       refList: (roles, attribute, fallback) => {
         const reachable = reachableMatches(roles);
         if (reachable.length > 0) {
+          // A diagram can contain many resources of the same role. Only use
+          // the closest connected tier so an ALB wired to public subnets does
+          // not also absorb private/data subnets through the VPC graph.
+          const nearestDistance = reachable[0].distance;
+          const nearest = reachable.filter((match) => match.distance === nearestDistance);
           return listOf(
-            reachable.map((match) => raw(resolveAttribute(match.item.target, attribute))),
+            nearest.map((match) => raw(resolveAttribute(match.item.target, attribute))),
           );
         }
         noteFallback(fallback);
