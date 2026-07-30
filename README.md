@@ -182,13 +182,20 @@ also accept any region-supported custom instance type.
 Requires Node.js `22.13.0` or newer.
 
 ```bash
-git clone <your-repository-url>
-cd TF-visual-builder
+git clone https://github.com/karthikmeduri/InfraCanvas.git
+cd InfraCanvas
 npm install
 npm run dev
 ```
 
 Open <http://localhost:3000>.
+
+If you use GitHub's **Download ZIP** option instead of `git clone`, the extracted
+directory is normally named `InfraCanvas-main`, so enter it with:
+
+```bash
+cd InfraCanvas-main
+```
 
 ```bash
 npm run build       # production build (Cloudflare Workers)

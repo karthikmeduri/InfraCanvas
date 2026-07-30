@@ -13,19 +13,23 @@
  * schema-level check against downloaded providers.
  */
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
+import { build } from "esbuild";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const bundlePath = join(root, "dist", "generator-test-bundle.mjs");
 
-// Reuse the same bundle the test suite builds.
-execFileSync(
-  process.execPath,
-  [join(root, "node_modules", "esbuild", "bin", "esbuild"), join(root, "build", "test-entry", "generator.ts"), "--bundle", "--format=esm", "--platform=node", `--outfile=${bundlePath}`],
-  { stdio: "inherit", cwd: root },
-);
+// Reuse the same bundle the test suite builds. The JavaScript API is
+// cross-platform; invoking esbuild's native executable through Node is not.
+await build({
+  entryPoints: [join(root, "build", "test-entry", "generator.ts")],
+  bundle: true,
+  format: "esm",
+  platform: "node",
+  outfile: bundlePath,
+  logLevel: "info",
+});
 
 const { providers, generate, defaultValues } = await import(
   `file:///${bundlePath.replace(/\\/g, "/")}?t=${Date.now()}`
