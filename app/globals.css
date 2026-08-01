@@ -1115,6 +1115,21 @@ select:focus-visible {
   color: #8e929f;
 }
 
+.empty-canvas-overlay {
+  z-index: 15;
+  left: 50%;
+  top: calc(50% - 13px);
+  transform: translate(-50%, -50%);
+  width: min(390px, calc(100% - 40px));
+  padding: 24px 22px 22px;
+  border: 1px solid rgba(218, 215, 236, 0.9);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 18px 48px rgba(40, 43, 57, 0.12);
+  backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+
 .empty-canvas strong {
   display: block;
   color: #424653;
@@ -1137,6 +1152,20 @@ select:focus-visible {
   font-weight: 700;
   font-size: 10px;
   padding: 8px 11px;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  pointer-events: auto;
+}
+
+.empty-canvas button:hover {
+  border-color: #bcb4ee;
+  box-shadow: 0 8px 18px rgba(94, 82, 187, 0.16);
+  transform: translateY(-1px);
+}
+
+.empty-canvas button:focus-visible {
+  outline: 3px solid rgba(114, 92, 245, 0.3);
+  outline-offset: 3px;
 }
 
 .empty-canvas-graphic {

@@ -31,6 +31,7 @@ import type {
   FieldDefinition,
   ProviderId,
   ServiceDefinition,
+  ValidationIssue,
 } from "@/lib/types";
 import {
   getServerTheme,
@@ -46,6 +47,8 @@ const NODE_HEIGHT = 86;
 const GRID = 24;
 const CANVAS_WIDTH = 3200;
 const CANVAS_HEIGHT = 2200;
+// Direct document coordinates keep dropped resources under the pointer.
+const CANVAS_PAN_PADDING = 0;
 const STORAGE_KEY = "infracanvas.project.v2";
 
 type Doc = { nodes: DiagramNode[]; edges: DiagramEdge[] };
@@ -100,7 +103,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
 
   const [zoom, setZoom] = useState(1);
-  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(false);
   const [handMode, setHandMode] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [connectMode, setConnectMode] = useState(false);
@@ -111,7 +114,9 @@ export default function Home() {
 
   const [codeOpen, setCodeOpen] = useState(false);
   const [activeFile, setActiveFile] = useState("main.tf");
-  const [issuesOpen, setIssuesOpen] = useState(true);
+  const [issuesOpen, setIssuesOpen] = useState(false);
+  const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
+  const [examplePromptOpen, setExamplePromptOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
@@ -119,6 +124,7 @@ export default function Home() {
   const [toast, setToast] = useState("");
 
   const canvasRef = useRef<HTMLDivElement>(null);
+  const issuesPanelRef = useRef<HTMLDivElement>(null);
   const providerDialogRef = useRef<HTMLElement>(null);
   const decisionDialogRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -276,8 +282,21 @@ export default function Home() {
   }, [providerPickerOpen, storageReady]);
 
   useEffect(() => {
-    if (startupProvider || pendingProvider) decisionDialogRef.current?.focus();
-  }, [pendingProvider, startupProvider]);
+    if (startupProvider || pendingProvider || examplePromptOpen) {
+      decisionDialogRef.current?.focus();
+    }
+  }, [examplePromptOpen, pendingProvider, startupProvider]);
+
+  useEffect(() => {
+    if (providerPickerOpen || codeOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      if (canvas && canvas.scrollLeft === 0 && canvas.scrollTop === 0) {
+        canvas.scrollTo({ left: CANVAS_PAN_PADDING, top: CANVAS_PAN_PADDING });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [codeOpen, providerId, providerPickerOpen]);
 
   /* --------------------------------------------------------------- commands */
   const addNode =
@@ -297,12 +316,48 @@ export default function Home() {
       commit((current) => ({ ...current, nodes: [...current.nodes, node] }));
       setSelection([node.id]);
       setSelectedEdgeId(null);
+      setExamplePromptOpen(false);
       setMobileLibraryOpen(false);
       notify(`${service.name} added`);
+
+      // A stale scroll position must never make a successful drop look like it
+      // failed. Keep the user's viewport when the node is already visible and
+      // only recenter when it landed outside the current view.
+      window.requestAnimationFrame(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const screenX = CANVAS_PAN_PADDING + node.x * zoom - canvas.scrollLeft;
+        const screenY = CANVAS_PAN_PADDING + node.y * zoom - canvas.scrollTop;
+        const nodeWidth = NODE_WIDTH * zoom;
+        const nodeHeight = NODE_HEIGHT * zoom;
+        const visible =
+          screenX + nodeWidth > 24 &&
+          screenX < canvas.clientWidth - 24 &&
+          screenY + nodeHeight > 72 &&
+          screenY < canvas.clientHeight - 24;
+        if (!visible) {
+          canvas.scrollTo({
+            left: Math.max(
+              0,
+              CANVAS_PAN_PADDING +
+                (node.x + NODE_WIDTH / 2) * zoom -
+                canvas.clientWidth / 2,
+            ),
+            top: Math.max(
+              0,
+              CANVAS_PAN_PADDING +
+                (node.y + NODE_HEIGHT / 2) * zoom -
+                canvas.clientHeight / 2,
+            ),
+            behavior: "smooth",
+          });
+        }
+      });
     };
 
   const loadSample =
     (targetProvider: ProviderId) => {
+      setExamplePromptOpen(false);
       const definition = providerById(targetProvider);
       const layout = SAMPLE_ARCHITECTURES[targetProvider];
       const sampleNodes: DiagramNode[] = layout.flatMap((entry, index) => {
@@ -357,8 +412,18 @@ export default function Home() {
       setZoom(nextZoom);
       window.requestAnimationFrame(() => {
         canvas?.scrollTo({
-          left: Math.max(0, minX * nextZoom - 32),
-          top: Math.max(0, minY * nextZoom - 32),
+          left: Math.max(
+            0,
+            CANVAS_PAN_PADDING +
+              ((minX + maxX) / 2) * nextZoom -
+              (canvas?.clientWidth ?? 0) / 2,
+          ),
+          top: Math.max(
+            0,
+            CANVAS_PAN_PADDING +
+              ((minY + maxY) / 2) * nextZoom -
+              (canvas?.clientHeight ?? 0) / 2,
+          ),
           behavior: "smooth",
         });
       });
@@ -381,6 +446,15 @@ export default function Home() {
         setSelection([]);
         setSelectedEdgeId(null);
         setZoom(1);
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            canvasRef.current?.scrollTo({
+              left: CANVAS_PAN_PADDING,
+              top: CANVAS_PAN_PADDING,
+            });
+          });
+        });
+        setExamplePromptOpen(true);
         notify(`${definition.shortName} blank canvas ready`);
       }
     };
@@ -422,6 +496,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setStartupProvider(null);
+    setExamplePromptOpen(false);
     notify(`Resumed ${savedDraft.projectName}`);
   };
 
@@ -486,6 +561,16 @@ export default function Home() {
     commit(() => emptyDoc);
     setSelection([]);
     setSelectedEdgeId(null);
+    setZoom(1);
+    setExamplePromptOpen(true);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        canvasRef.current?.scrollTo({
+          left: CANVAS_PAN_PADDING,
+          top: CANVAS_PAN_PADDING,
+        });
+      });
+    });
     notify("Canvas cleared");
   };
 
@@ -524,8 +609,8 @@ export default function Home() {
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
       return {
-        x: (clientX - rect.left + canvas.scrollLeft) / zoom,
-        y: (clientY - rect.top + canvas.scrollTop) / zoom,
+        x: (clientX - rect.left + canvas.scrollLeft - CANVAS_PAN_PADDING) / zoom,
+        y: (clientY - rect.top + canvas.scrollTop - CANVAS_PAN_PADDING) / zoom,
       };
     };
 
@@ -557,8 +642,18 @@ export default function Home() {
     );
     setZoom(nextZoom);
     requestAnimationFrame(() => {
-      canvas.scrollLeft = Math.max(0, (bounds.minX - 60) * nextZoom);
-      canvas.scrollTop = Math.max(0, (bounds.minY - 60) * nextZoom);
+      canvas.scrollLeft = Math.max(
+        0,
+        CANVAS_PAN_PADDING +
+          ((bounds.minX + bounds.maxX) / 2) * nextZoom -
+          canvas.clientWidth / 2,
+      );
+      canvas.scrollTop = Math.max(
+        0,
+        CANVAS_PAN_PADDING +
+          ((bounds.minY + bounds.maxY) / 2) * nextZoom -
+          canvas.clientHeight / 2,
+      );
     });
   };
 
@@ -568,16 +663,48 @@ export default function Home() {
       const canvas = canvasRef.current;
       if (!node || !canvas) return;
       canvas.scrollTo({
-        left: Math.max(0, node.x * zoom - canvas.clientWidth / 2 + NODE_WIDTH),
-        top: Math.max(0, node.y * zoom - canvas.clientHeight / 2 + NODE_HEIGHT),
+        left: Math.max(
+          0,
+          CANVAS_PAN_PADDING + node.x * zoom - canvas.clientWidth / 2 + NODE_WIDTH,
+        ),
+        top: Math.max(
+          0,
+          CANVAS_PAN_PADDING + node.y * zoom - canvas.clientHeight / 2 + NODE_HEIGHT,
+        ),
         behavior: "smooth",
       });
     };
 
+  const focusValidationIssue = (issue: ValidationIssue) => {
+    setIssuesOpen(true);
+    setActiveIssueId(issue.id);
+    setCodeOpen(false);
+    if (issue.nodeId) {
+      setSelection([issue.nodeId]);
+      setSelectedEdgeId(null);
+    }
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (issue.nodeId) revealNode(issue.nodeId);
+        issuesPanelRef.current?.focus();
+      });
+    });
+  };
+
+  const openValidation = () => {
+    if (issues.length === 0) {
+      notify("Diagram validation is clean");
+      return;
+    }
+    focusValidationIssue(issues[0]);
+  };
+
   /* --------------------------------------------------------- drag and drop */
   const onCanvasDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const serviceId = event.dataTransfer.getData("application/infracanvas-service");
+    const serviceId =
+      event.dataTransfer.getData("application/infracanvas-service") ||
+      event.dataTransfer.getData("text/plain");
     if (!serviceId) return;
     const point = toCanvasPoint(event.clientX, event.clientY);
     addNode(serviceId, point.x - NODE_WIDTH / 2, point.y - NODE_HEIGHT / 2);
@@ -585,7 +712,13 @@ export default function Home() {
 
   const onNodePointerDown = (event: ReactPointerEvent<HTMLDivElement>, node: DiagramNode) => {
     event.stopPropagation();
+    if (handMode) {
+      event.preventDefault();
+      beginCanvasPan(event.pointerId, event.clientX, event.clientY);
+      return;
+    }
     if (connectMode) return;
+    setActiveIssueId(null);
 
     const additive = event.shiftKey || event.metaKey || event.ctrlKey;
     const preserveGroupForDrag =
@@ -601,10 +734,7 @@ export default function Home() {
     setSelection(nextSelection);
     setSelectedEdgeId(null);
     setMobileInspectorOpen(true);
-    if (additive || handMode) {
-      if (handMode && preserveGroupForDrag) setSelection([node.id]);
-      return;
-    }
+    if (additive) return;
 
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
@@ -748,19 +878,25 @@ export default function Home() {
   };
 
   /* --------------------------------------------------------- canvas gestures */
+  const beginCanvasPan = (pointerId: number, clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.setPointerCapture(pointerId);
+    panRef.current = {
+      pointerId,
+      startX: clientX,
+      startY: clientY,
+      scrollLeft: canvas.scrollLeft,
+      scrollTop: canvas.scrollTop,
+    };
+    setIsPanning(true);
+  };
+
   const onCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
 
     if (handMode) {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      panRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        scrollLeft: event.currentTarget.scrollLeft,
-        scrollTop: event.currentTarget.scrollTop,
-      };
-      setIsPanning(true);
+      beginCanvasPan(event.pointerId, event.clientX, event.clientY);
       return;
     }
 
@@ -892,6 +1028,7 @@ export default function Home() {
     connectionStart,
     deleteSelection,
     duplicateSelection,
+    examplePromptOpen,
     nodes,
     notify,
     pendingProvider,
@@ -911,6 +1048,7 @@ export default function Home() {
       connectionStart,
       deleteSelection,
       duplicateSelection,
+      examplePromptOpen,
       nodes,
       notify,
       pendingProvider,
@@ -933,6 +1071,7 @@ export default function Home() {
         connectionStart,
         deleteSelection,
         duplicateSelection,
+        examplePromptOpen,
         nodes,
         notify,
         pendingProvider,
@@ -949,6 +1088,7 @@ export default function Home() {
 
       if (event.key === "Escape") {
         if (shortcutsOpen) return setShortcutsOpen(false);
+        if (examplePromptOpen) return setExamplePromptOpen(false);
         if (startupProvider) {
           setStartupProvider(null);
           return setProviderPickerOpen(true);
@@ -1146,8 +1286,10 @@ export default function Home() {
         <div className="validation-status">
           <button
             className={`issue-chip ${errorCount > 0 ? "has-errors" : warningCount > 0 ? "has-warnings" : "clean"}`}
-            onClick={() => setIssuesOpen((current) => !current)}
+            onClick={openValidation}
             aria-expanded={issuesOpen}
+            aria-controls="architecture-validation"
+            title={issues.length > 0 ? "Show validation details and focus the first issue" : "Diagram validation is clean"}
           >
             <span className="status-dot" />
             {errorCount > 0
@@ -1231,15 +1373,24 @@ export default function Home() {
                                 "application/infracanvas-service",
                                 service.id,
                               );
+                              // Some embedded browsers only preserve standard
+                              // transfer types across a drag operation.
+                              event.dataTransfer.setData("text/plain", service.id);
                               event.dataTransfer.effectAllowed = "copy";
                             }}
-                            onDoubleClick={() => {
+                            onClick={() => {
                               const canvas = canvasRef.current;
-                              const x = canvas ? (canvas.scrollLeft + canvas.clientWidth / 2) / zoom : 360;
-                              const y = canvas ? (canvas.scrollTop + canvas.clientHeight / 2) / zoom : 240;
+                              const x = canvas
+                                ? (canvas.scrollLeft - CANVAS_PAN_PADDING + canvas.clientWidth / 2) /
+                                  zoom
+                                : 360;
+                              const y = canvas
+                                ? (canvas.scrollTop - CANVAS_PAN_PADDING + canvas.clientHeight / 2) /
+                                  zoom
+                                : 240;
                               addNode(service.id, x - NODE_WIDTH / 2, y - NODE_HEIGHT / 2);
                             }}
-                            title={`Drag ${service.name} onto the canvas, or double-click to add it`}
+                            title={`Drag ${service.name} onto the canvas, or click to add it`}
                           >
                             <span
                               className="service-icon"
@@ -1350,6 +1501,15 @@ export default function Home() {
               <button onClick={clearCanvas} disabled={nodes.length === 0}>
                 Clear
               </button>
+              {nodes.length === 0 && (
+                <button
+                  className="load-example-tool"
+                  onClick={() => setExamplePromptOpen(true)}
+                  title={`Load the secure ${provider.shortName} reference architecture`}
+                >
+                  Load example
+                </button>
+              )}
               <span className="toolbar-divider" />
               <button onClick={exportSvg} disabled={nodes.length === 0} title="Export diagram as SVG">
                 SVG
@@ -1381,13 +1541,20 @@ export default function Home() {
             >
               <div
                 className="canvas-scroll"
-                style={{ width: CANVAS_WIDTH * zoom, height: CANVAS_HEIGHT * zoom }}
+                style={{
+                  width: CANVAS_WIDTH * zoom + CANVAS_PAN_PADDING * 2,
+                  height: CANVAS_HEIGHT * zoom + CANVAS_PAN_PADDING * 2,
+                  position: "relative",
+                }}
               >
                 <div
                   className="canvas-content"
                   style={{
                     width: CANVAS_WIDTH,
                     height: CANVAS_HEIGHT,
+                    position: "absolute",
+                    left: CANVAS_PAN_PADDING,
+                    top: CANVAS_PAN_PADDING,
                     transform: `scale(${zoom})`,
                   }}
                 >
@@ -1431,6 +1598,7 @@ export default function Home() {
                           style={{ "--edge-color": accent } as CSSProperties}
                           onClick={(event) => {
                             event.stopPropagation();
+                            if (handMode) return;
                             setSelectedEdgeId(edge.id);
                             setSelection([]);
                           }}
@@ -1476,6 +1644,7 @@ export default function Home() {
                     if (!service) return null;
                     const selected = selection.includes(node.id);
                     const nodeIssues = issues.filter((issue) => issue.nodeId === node.id);
+                    const focusedIssue = nodeIssues.find((issue) => issue.id === activeIssueId);
                     const worst = nodeIssues.some((issue) => issue.severity === "error")
                       ? "error"
                       : nodeIssues.length > 0
@@ -1484,7 +1653,7 @@ export default function Home() {
                     return (
                       <div
                         key={node.id}
-                        className={`diagram-node ${selected ? "selected" : ""} ${connectionStart === node.id ? "connection-start" : ""} status-${worst}`}
+                        className={`diagram-node ${selected ? "selected" : ""} ${focusedIssue ? `validation-focus validation-${focusedIssue.severity}` : ""} ${connectionStart === node.id ? "connection-start" : ""} status-${worst}`}
                         style={
                           {
                             left: node.x,
@@ -1580,30 +1749,6 @@ export default function Home() {
                     />
                   )}
 
-                  {nodes.length === 0 && (
-                    <div className="empty-canvas">
-                      <span className="empty-canvas-graphic">
-                        <i />
-                        <i />
-                        <i />
-                      </span>
-                      <strong>Start composing your architecture</strong>
-                      <p>
-                        Drag services from the library, or load a secure real-world {provider.shortName}{" "}
-                        example with {SAMPLE_ARCHITECTURES[provider.id].length} configured resources
-                        across every available category.
-                      </p>
-                      <button
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          loadSample(provider.id);
-                        }}
-                      >
-                        Load real-world example architecture
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -1625,8 +1770,18 @@ export default function Home() {
                     const ratioX = (event.clientX - rect.left) / rect.width;
                     const ratioY = (event.clientY - rect.top) / rect.height;
                     canvas.scrollTo({
-                      left: Math.max(0, (bounds.minX + ratioX * (bounds.maxX - bounds.minX)) * zoom - canvas.clientWidth / 2),
-                      top: Math.max(0, (bounds.minY + ratioY * (bounds.maxY - bounds.minY)) * zoom - canvas.clientHeight / 2),
+                      left: Math.max(
+                        0,
+                        CANVAS_PAN_PADDING +
+                          (bounds.minX + ratioX * (bounds.maxX - bounds.minX)) * zoom -
+                          canvas.clientWidth / 2,
+                      ),
+                      top: Math.max(
+                        0,
+                        CANVAS_PAN_PADDING +
+                          (bounds.minY + ratioY * (bounds.maxY - bounds.minY)) * zoom -
+                          canvas.clientHeight / 2,
+                      ),
                       behavior: "smooth",
                     });
                   }}
@@ -1685,29 +1840,71 @@ export default function Home() {
               )}
             </div>
 
+            {nodes.length === 0 && (
+              <div
+                className="empty-canvas empty-canvas-overlay"
+                role="status"
+                aria-label="Blank architecture canvas"
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <span className="empty-canvas-graphic" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <strong>Start composing your architecture</strong>
+                <p>
+                  Drag services from the library, or load a secure real-world {provider.shortName}{" "}
+                  example with {SAMPLE_ARCHITECTURES[provider.id].length} configured resources across
+                  every available category.
+                </p>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    loadSample(provider.id);
+                  }}
+                >
+                  Load real-world example architecture
+                </button>
+              </div>
+            )}
+
             {issuesOpen && issues.length > 0 && (
-              <div className="issues-panel" aria-label="Architecture validation">
+              <div
+                ref={issuesPanelRef}
+                id="architecture-validation"
+                className="issues-panel"
+                aria-label="Architecture validation"
+                aria-live="polite"
+                tabIndex={-1}
+              >
                 <div className="issues-head">
                   <strong>Validation</strong>
                   <span>
                     {errorCount} {errorCount === 1 ? "error" : "errors"} · {warningCount}{" "}
                     {warningCount === 1 ? "warning" : "warnings"}
                   </span>
-                  <button onClick={() => setIssuesOpen(false)} aria-label="Hide validation panel">
-                    ×
+                  <button
+                    className="issues-back-button"
+                    onClick={() => {
+                      setIssuesOpen(false);
+                      setActiveIssueId(null);
+                    }}
+                    aria-label="Close validation and return to canvas"
+                  >
+                    <span aria-hidden="true">←</span> Back to canvas
                   </button>
                 </div>
                 <ul>
                   {issues.slice(0, 40).map((issue) => (
-                    <li key={issue.id} className={`issue ${issue.severity}`}>
+                    <li
+                      key={issue.id}
+                      className={`issue ${issue.severity} ${activeIssueId === issue.id ? "active" : ""}`}
+                    >
                       <button
-                        onClick={() => {
-                          if (!issue.nodeId) return;
-                          setSelection([issue.nodeId]);
-                          setSelectedEdgeId(null);
-                          revealNode(issue.nodeId);
-                        }}
-                        disabled={!issue.nodeId}
+                        onClick={() => focusValidationIssue(issue)}
+                        aria-current={activeIssueId === issue.id ? "true" : undefined}
                       >
                         <i aria-hidden="true">
                           {issue.severity === "error" ? "!" : issue.severity === "warning" ? "▲" : "i"}
@@ -2037,6 +2234,44 @@ export default function Home() {
           </section>
         </div>
       )}
+
+      {examplePromptOpen &&
+        !providerPickerOpen &&
+        !startupProvider &&
+        !pendingProvider &&
+        nodes.length === 0 && (
+          <div className="modal-backdrop example-start-backdrop" role="presentation">
+            <section
+              ref={decisionDialogRef}
+              className="confirm-modal example-start-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="example-start-title"
+              tabIndex={-1}
+              style={{ "--provider-accent": provider.accent } as CSSProperties}
+            >
+              <span className="example-start-icon" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="step-chip">STEP 2 OF 3</span>
+              <h2 id="example-start-title">Your {provider.shortName} canvas is ready</h2>
+              <p>
+                Start from the center of a blank canvas, or load the secure production example
+                with {SAMPLE_ARCHITECTURES[provider.id].length} configured resources.
+              </p>
+              <div className="confirm-actions two-actions">
+                <button className="primary-small" onClick={() => loadSample(provider.id)}>
+                  Load example architecture
+                </button>
+                <button className="ghost-button" onClick={() => setExamplePromptOpen(false)}>
+                  Start with blank canvas
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
 
       {shortcutsOpen && (
         <div

@@ -526,6 +526,35 @@ body {
     0 10px 26px rgba(35, 38, 54, 0.16);
 }
 
+.diagram-node.validation-focus {
+  z-index: 9;
+  outline: 3px solid var(--warn);
+  outline-offset: 4px;
+  animation: validation-node-focus 850ms ease-in-out 2;
+}
+
+.diagram-node.validation-focus.validation-error {
+  outline-color: var(--danger);
+}
+
+.diagram-node.validation-focus.validation-info {
+  outline-color: var(--violet);
+}
+
+@keyframes validation-node-focus {
+  0%,
+  100% {
+    outline-offset: 3px;
+  }
+  50% {
+    outline-offset: 9px;
+  }
+}
+
+.diagram-canvas.is-hand-tool .node-port {
+  pointer-events: none;
+}
+
 /* Tool state must stay unmistakable in both themes. The aria state is the
    source of truth, so visual feedback cannot drift from interaction state. */
 .canvas-toolbar .hand-tool-button[aria-pressed="true"] {
@@ -682,7 +711,13 @@ body {
   background: var(--panel-2);
   font-size: 10.5px;
   font-weight: 620;
+  cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease;
+}
+
+.issue-chip:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--violet) 28%, transparent);
+  outline-offset: 2px;
 }
 
 .issue-chip .status-dot {
@@ -712,11 +747,24 @@ body {
 }
 
 .issues-panel {
-  border-top: 1px solid var(--hairline);
+  position: absolute;
+  z-index: 30;
+  top: 74px;
+  right: 12px;
+  width: min(430px, calc(100% - 24px));
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
   background: var(--panel-2);
-  max-height: 168px;
+  max-height: min(420px, calc(100% - 118px));
   display: flex;
   flex-direction: column;
+  box-shadow: 0 18px 48px rgba(20, 22, 32, 0.2);
+  overflow: hidden;
+}
+
+.issues-panel:focus {
+  outline: 2px solid color-mix(in srgb, var(--violet) 28%, transparent);
+  outline-offset: -2px;
 }
 
 .issues-head {
@@ -740,15 +788,66 @@ body {
 }
 
 .issues-head button {
-  width: 20px;
-  height: 20px;
-  border: 0;
-  background: transparent;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 15px;
+  min-height: 32px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
   line-height: 1;
+  padding: 0 10px;
+  cursor: pointer;
 }
+
+.issues-head button:hover {
+  border-color: color-mix(in srgb, var(--violet) 42%, var(--hairline));
+  color: var(--violet);
+}
+
+.issues-back-button span {
+  margin-right: 4px;
+}
+
+.load-example-tool {
+  border: 1px solid color-mix(in srgb, var(--violet) 34%, var(--hairline)) !important;
+  background: color-mix(in srgb, var(--violet) 10%, var(--panel)) !important;
+  color: var(--violet) !important;
+}
+
+.example-start-backdrop {
+  z-index: 110;
+}
+
+.example-start-modal {
+  width: min(520px, 100%);
+  text-align: center;
+}
+
+.example-start-modal .step-chip {
+  margin: 0 auto 12px;
+}
+
+.example-start-icon {
+  position: relative;
+  display: block;
+  width: 112px;
+  height: 54px;
+  margin: 0 auto 12px;
+}
+
+.example-start-icon i {
+  position: absolute;
+  width: 36px;
+  height: 30px;
+  border: 2px solid color-mix(in srgb, var(--provider-accent) 55%, var(--hairline));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--provider-accent) 9%, var(--panel));
+}
+
+.example-start-icon i:nth-child(1) { left: 0; top: 18px; }
+.example-start-icon i:nth-child(2) { right: 0; top: 18px; }
+.example-start-icon i:nth-child(3) { left: 38px; top: 0; }
 
 .issues-panel ul {
   margin: 0;
@@ -773,6 +872,16 @@ body {
 
 .issues-panel .issue button:hover:not(:disabled) {
   background: var(--panel-3);
+}
+
+.issues-panel .issue.active button {
+  background: color-mix(in srgb, var(--warn) 12%, var(--panel-3));
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+
+.issues-panel .issue.error.active button {
+  background: color-mix(in srgb, var(--danger) 12%, var(--panel-3));
+  box-shadow: inset 3px 0 0 var(--danger);
 }
 
 .issues-panel .issue button:disabled {
@@ -1173,5 +1282,9 @@ body {
   .theme-switcher button,
   .canvas-toolbar .hand-tool-button {
     transition: none;
+  }
+
+  .diagram-node.validation-focus {
+    animation: none;
   }
 }
