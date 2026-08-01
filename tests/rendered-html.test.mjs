@@ -66,10 +66,12 @@ test("ships product code rather than starter scaffolding", async () => {
   assert.match(page, /"use client"/);
   assert.match(page, /application\/infracanvas-service/);
   assert.match(page, /localStorage/);
-  assert.match(page, /Choose how to begin/);
   assert.match(page, /resumeSavedDraft/);
-  assert.match(page, /Load secure example/);
-  assert.match(page, /Start new/);
+  assert.match(page, /Saved session found/);
+  assert.match(page, /Load saved session/);
+  assert.match(page, /Start new session/);
+  assert.match(page, /applyProvider\(nextId, false\)/);
+  assert.doesNotMatch(page, /session-choice|Choose how to begin/);
   assert.match(page, /--edge-color/);
   assert.match(page, /@\/lib\/terraform\/generate/);
   assert.match(layout, /InfraCanvas — Visual Cloud Architecture to Terraform/);

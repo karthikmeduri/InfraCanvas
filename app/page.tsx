@@ -84,6 +84,7 @@ export default function Home() {
   const [providerId, setProviderId] = useState<ProviderId>("aws");
   const [providerPickerOpen, setProviderPickerOpen] = useState(true);
   const [pendingProvider, setPendingProvider] = useState<ProviderId | null>(null);
+  const [startupProvider, setStartupProvider] = useState<ProviderId | null>(null);
   const [savedDraft, setSavedDraft] = useState<SavedDraft | null>(null);
   const [storageReady, setStorageReady] = useState(false);
   const [projectName, setProjectName] = useState("Production web platform");
@@ -119,6 +120,7 @@ export default function Home() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const providerDialogRef = useRef<HTMLElement>(null);
+  const decisionDialogRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -273,6 +275,10 @@ export default function Home() {
     if (providerPickerOpen && storageReady) providerDialogRef.current?.focus();
   }, [providerPickerOpen, storageReady]);
 
+  useEffect(() => {
+    if (startupProvider || pendingProvider) decisionDialogRef.current?.focus();
+  }, [pendingProvider, startupProvider]);
+
   /* --------------------------------------------------------------- commands */
   const addNode =
     (serviceId: string, x: number, y: number) => {
@@ -365,6 +371,7 @@ export default function Home() {
       setProviderId(nextId);
       setProviderPickerOpen(false);
       setPendingProvider(null);
+      setStartupProvider(null);
       setCodeOpen(false);
       setSearch("");
       if (withSample) {
@@ -381,7 +388,14 @@ export default function Home() {
   const chooseProvider =
     (nextId: ProviderId) => {
       if (nodes.length === 0) {
+        if (!storageReady) return;
         setProviderId(nextId);
+        setProviderPickerOpen(false);
+        if (savedDraft) {
+          setStartupProvider(nextId);
+        } else {
+          applyProvider(nextId, false);
+        }
         return;
       }
       // Switching provider invalidates every node, so never discard work silently.
@@ -407,6 +421,7 @@ export default function Home() {
     setSelectedEdgeId(null);
     setProviderPickerOpen(false);
     setCodeOpen(false);
+    setStartupProvider(null);
     notify(`Resumed ${savedDraft.projectName}`);
   };
 
@@ -884,6 +899,7 @@ export default function Home() {
     saveProject,
     shortcutsOpen,
     snapToGrid,
+    startupProvider,
     undo,
     zoomToFit,
   });
@@ -902,6 +918,7 @@ export default function Home() {
       saveProject,
       shortcutsOpen,
       snapToGrid,
+      startupProvider,
       undo,
       zoomToFit,
     };
@@ -923,6 +940,7 @@ export default function Home() {
         saveProject,
         shortcutsOpen,
         snapToGrid,
+        startupProvider,
         undo,
         zoomToFit,
       } = commandsRef.current;
@@ -931,6 +949,10 @@ export default function Home() {
 
       if (event.key === "Escape") {
         if (shortcutsOpen) return setShortcutsOpen(false);
+        if (startupProvider) {
+          setStartupProvider(null);
+          return setProviderPickerOpen(true);
+        }
         if (pendingProvider) return setPendingProvider(null);
         if (connectionStart || connectMode) return cancelConnection();
         if (codeOpen) return setCodeOpen(false);
@@ -1567,8 +1589,9 @@ export default function Home() {
                       </span>
                       <strong>Start composing your architecture</strong>
                       <p>
-                        Drag services from the library, then connect them. Every connection becomes
-                        a real Terraform reference.
+                        Drag services from the library, or load a secure real-world {provider.shortName}{" "}
+                        example with {SAMPLE_ARCHITECTURES[provider.id].length} configured resources
+                        across every available category.
                       </p>
                       <button
                         onPointerDown={(event) => event.stopPropagation()}
@@ -1577,7 +1600,7 @@ export default function Home() {
                           loadSample(provider.id);
                         }}
                       >
-                        Load secure reference architecture
+                        Load real-world example architecture
                       </button>
                     </div>
                   )}
@@ -1902,6 +1925,7 @@ export default function Home() {
                   className={`provider-card ${item.id === providerId ? "current" : ""}`}
                   onClick={() => chooseProvider(item.id)}
                   style={{ "--provider-accent": item.accent } as CSSProperties}
+                  disabled={!storageReady && nodes.length === 0}
                 >
                   <ProviderMark provider={item.id} className="provider-card-mark" />
                   <span>
@@ -1916,79 +1940,9 @@ export default function Home() {
               ))}
             </div>
             {!storageReady && nodes.length === 0 && (
-              <div className="session-loading" aria-live="polite">Checking for a saved diagram…</div>
-            )}
-            {storageReady && nodes.length === 0 && (
-              <section className="session-chooser" aria-labelledby="session-choice-title">
-                <div className="session-choice-heading">
-                  <span id="session-choice-title">Choose how to begin</span>
-                  <small>Nothing is loaded until you choose an option.</small>
-                </div>
-                <div className={`session-choice-grid ${savedDraft ? "has-saved-draft" : ""}`}>
-                  {savedDraft && (
-                    <button
-                      className="session-choice saved-choice"
-                      onClick={resumeSavedDraft}
-                      style={
-                        {
-                          "--choice-accent": providerById(savedDraft.providerId).accent,
-                        } as CSSProperties
-                      }
-                    >
-                      <span className="session-choice-icon">
-                        <ProviderMark
-                          provider={savedDraft.providerId}
-                          className="session-provider-mark"
-                        />
-                      </span>
-                      <span className="session-choice-copy">
-                        <small>Saved in this browser</small>
-                        <strong>{savedDraft.projectName}</strong>
-                        <em>
-                          {providerById(savedDraft.providerId).shortName} · {savedDraft.nodes.length}{" "}
-                          resources · {savedDraft.edges.length} connections
-                        </em>
-                      </span>
-                      <b>Resume</b>
-                    </button>
-                  )}
-                  <button
-                    className={`session-choice blank-choice ${!savedDraft ? "recommended" : ""}`}
-                    onClick={() => applyProvider(provider.id, false)}
-                    style={{ "--choice-accent": "#725cf5" } as CSSProperties}
-                  >
-                    <span className="session-choice-icon blank-canvas-icon" aria-hidden="true">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
-                    <span className="session-choice-copy">
-                      <small>{!savedDraft ? "Recommended" : "Clean workspace"}</small>
-                      <strong>Start new</strong>
-                      <em>Open a blank {provider.shortName} canvas</em>
-                    </span>
-                    <b>Blank</b>
-                  </button>
-                  <button
-                    className="session-choice example-choice"
-                    onClick={() => applyProvider(provider.id, true)}
-                    style={{ "--choice-accent": provider.accent } as CSSProperties}
-                  >
-                    <span className="session-choice-icon">
-                      <ProviderMark provider={provider.id} className="session-provider-mark" />
-                    </span>
-                    <span className="session-choice-copy">
-                      <small>Production reference</small>
-                      <strong>Load secure example</strong>
-                      <em>
-                        {SAMPLE_ARCHITECTURES[provider.id].length} configured {provider.shortName}{" "}
-                        resources
-                      </em>
-                    </span>
-                    <b>Example</b>
-                  </button>
-                </div>
-              </section>
+              <div className="provider-storage-status" aria-live="polite">
+                Checking this browser for a saved session…
+              </div>
             )}
             <div className="provider-modal-footer">
               <span>
@@ -2010,9 +1964,64 @@ export default function Home() {
         </div>
       )}
 
+      {startupProvider && savedDraft && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            ref={decisionDialogRef}
+            className="confirm-modal saved-session-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="saved-session-title"
+            tabIndex={-1}
+          >
+            <h2 id="saved-session-title">Saved session found</h2>
+            <p>
+              Resume the diagram stored in this browser, or start a new blank{" "}
+              {providerById(startupProvider).shortName} canvas.
+            </p>
+            <div
+              className="saved-draft-summary"
+              style={
+                {
+                  "--provider-accent": providerById(savedDraft.providerId).accent,
+                } as CSSProperties
+              }
+            >
+              <ProviderMark provider={savedDraft.providerId} className="saved-draft-mark" />
+              <span>
+                <small>Saved in this browser</small>
+                <strong>{savedDraft.projectName}</strong>
+                <em>
+                  {providerById(savedDraft.providerId).shortName} · {savedDraft.nodes.length}{" "}
+                  resources · {savedDraft.edges.length} connections
+                </em>
+              </span>
+            </div>
+            <div className="confirm-actions two-actions">
+              <button className="primary-small" onClick={resumeSavedDraft}>
+                Load saved session
+              </button>
+              <button
+                className="ghost-button"
+                onClick={() => applyProvider(startupProvider, false)}
+              >
+                Start new session
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {pendingProvider && (
         <div className="modal-backdrop" role="presentation">
-          <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="switch-title">
+          <section
+            ref={decisionDialogRef}
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="switch-title"
+            tabIndex={-1}
+          >
             <h2 id="switch-title">Switch to {providerById(pendingProvider).shortName}?</h2>
             <p>
               {providerById(pendingProvider).shortName} uses different resources, so the{" "}
@@ -2021,11 +2030,8 @@ export default function Home() {
             </p>
             <div className="confirm-actions">
               <button onClick={() => setPendingProvider(null)}>Cancel</button>
-              <button className="ghost-button" onClick={() => applyProvider(pendingProvider, false)}>
-                Switch and start empty
-              </button>
-              <button className="primary-small" onClick={() => applyProvider(pendingProvider, true)}>
-                Switch and load example
+              <button className="primary-small" onClick={() => applyProvider(pendingProvider, false)}>
+                Switch and start blank
               </button>
             </div>
           </section>
