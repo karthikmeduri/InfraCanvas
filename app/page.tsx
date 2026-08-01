@@ -27,6 +27,7 @@ import { generate } from "@/lib/terraform/generate";
 import type {
   DiagramEdge,
   DiagramNode,
+  DiagramState,
   FieldDefinition,
   ProviderId,
   ServiceDefinition,
@@ -48,12 +49,16 @@ const CANVAS_HEIGHT = 2200;
 const STORAGE_KEY = "infracanvas.project.v2";
 
 type Doc = { nodes: DiagramNode[]; edges: DiagramEdge[] };
+type SavedDraft = DiagramState & { savedAt?: string };
 type Marquee = { x: number; y: number; width: number; height: number };
 
 const emptyDoc: Doc = { nodes: [], edges: [] };
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+const edgeMarkerId = (providerId: ProviderId, accent: string) =>
+  `edge-arrow-${providerId}-${accent.replace(/[^a-z0-9]/gi, "")}`;
 
 const isTypingTarget = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
@@ -79,6 +84,8 @@ export default function Home() {
   const [providerId, setProviderId] = useState<ProviderId>("aws");
   const [providerPickerOpen, setProviderPickerOpen] = useState(true);
   const [pendingProvider, setPendingProvider] = useState<ProviderId | null>(null);
+  const [savedDraft, setSavedDraft] = useState<SavedDraft | null>(null);
+  const [storageReady, setStorageReady] = useState(false);
   const [projectName, setProjectName] = useState("Production web platform");
 
   const [doc, setDoc] = useState<Doc>(emptyDoc);
@@ -111,6 +118,7 @@ export default function Home() {
   const [toast, setToast] = useState("");
 
   const canvasRef = useRef<HTMLDivElement>(null);
+  const providerDialogRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -213,21 +221,21 @@ export default function Home() {
   const notify = (message: string) => setToast(message);
 
   /* ---------------------------------------------------------------- effects */
-  // Restoring a saved draft is a one-shot read of an external store into
-  // editable state, which is what setState-in-effect exists for. Reading it
-  // during render instead would desynchronise SSR and hydration.
+  // Discover a saved draft without restoring it automatically. Every browser
+  // session starts at the explicit resume / example / blank decision.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return;
+    if (!stored) {
+      setStorageReady(true);
+      return;
+    }
     try {
-      const parsed = JSON.parse(stored) as {
-        providerId?: ProviderId;
-        projectName?: string;
-        nodes?: DiagramNode[];
-        edges?: DiagramEdge[];
-      };
-      if (!parsed.providerId || !providers.some((item) => item.id === parsed.providerId)) return;
+      const parsed = JSON.parse(stored) as Partial<SavedDraft>;
+      if (!parsed.providerId || !providers.some((item) => item.id === parsed.providerId)) {
+        window.localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
 
       // Drop anything the current catalog no longer defines so a stale save
       // cannot render an unknown service.
@@ -237,23 +245,20 @@ export default function Home() {
       );
       const validIds = new Set(validNodes.map((node) => node.id));
 
-      // Continue the id sequence past anything already saved.
-      validNodes.forEach((node) => {
-        const suffix = /-n(\d+)$/.exec(node.id);
-        if (suffix) idCounter.current = Math.max(idCounter.current, Number(suffix[1]));
-      });
-
       setProviderId(parsed.providerId);
-      setProjectName(parsed.projectName ?? "Production web platform");
-      setDoc({
+      setSavedDraft({
+        providerId: parsed.providerId,
+        projectName: parsed.projectName ?? "Production web platform",
         nodes: validNodes,
         edges: (parsed.edges ?? []).filter(
           (edge) => validIds.has(edge.from) && validIds.has(edge.to),
         ),
+        savedAt: parsed.savedAt,
       });
-      setProviderPickerOpen(false);
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
+    } finally {
+      setStorageReady(true);
     }
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -263,6 +268,10 @@ export default function Home() {
     const timer = window.setTimeout(() => setToast(""), 2600);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (providerPickerOpen && storageReady) providerDialogRef.current?.focus();
+  }, [providerPickerOpen, storageReady]);
 
   /* --------------------------------------------------------------- commands */
   const addNode =
@@ -347,33 +356,59 @@ export default function Home() {
           behavior: "smooth",
         });
       });
-      notify(
-        targetProvider === "aws"
-          ? "Secure AWS production reference architecture loaded"
-          : `${definition.shortName} reference architecture loaded`,
-      );
+      notify(`Secure ${definition.shortName} production reference architecture loaded`);
     };
 
   const applyProvider =
     (nextId: ProviderId, withSample: boolean) => {
+      const definition = providerById(nextId);
       setProviderId(nextId);
       setProviderPickerOpen(false);
       setPendingProvider(null);
       setCodeOpen(false);
       setSearch("");
-      if (withSample) loadSample(nextId);
-      notify(`${providerById(nextId).shortName} resource library loaded`);
+      if (withSample) {
+        loadSample(nextId);
+      } else {
+        if (nodes.length > 0) commit(() => emptyDoc);
+        setSelection([]);
+        setSelectedEdgeId(null);
+        setZoom(1);
+        notify(`${definition.shortName} blank canvas ready`);
+      }
     };
 
   const chooseProvider =
     (nextId: ProviderId) => {
+      if (nodes.length === 0) {
+        setProviderId(nextId);
+        return;
+      }
       // Switching provider invalidates every node, so never discard work silently.
       if (nodes.length > 0 && nextId !== providerId) {
         setPendingProvider(nextId);
         return;
       }
-      applyProvider(nextId, nodes.length === 0);
+      setProviderPickerOpen(false);
     };
+
+  const resumeSavedDraft = () => {
+    if (!savedDraft) return;
+    savedDraft.nodes.forEach((node) => {
+      const suffix = /-n(\d+)$/.exec(node.id);
+      if (suffix) idCounter.current = Math.max(idCounter.current, Number(suffix[1]));
+    });
+    setProviderId(savedDraft.providerId);
+    setProjectName(savedDraft.projectName);
+    setDoc({ nodes: savedDraft.nodes, edges: savedDraft.edges });
+    setPast([]);
+    setFuture([]);
+    setSelection([]);
+    setSelectedEdgeId(null);
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    notify(`Resumed ${savedDraft.projectName}`);
+  };
 
   const deleteSelection = () => {
     if (selectedEdgeId) {
@@ -452,10 +487,18 @@ export default function Home() {
     };
 
   const saveProject = () => {
+    const draft: SavedDraft = {
+      providerId,
+      projectName,
+      nodes,
+      edges,
+      savedAt: new Date().toISOString(),
+    };
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ providerId, projectName, nodes, edges }),
+      JSON.stringify(draft),
     );
+    setSavedDraft(draft);
     notify("Project saved in this browser");
   };
 
@@ -1006,7 +1049,7 @@ export default function Home() {
             value={projectName}
             onChange={(event) => setProjectName(event.target.value)}
           />
-          <span className="saved-state">Local draft</span>
+          <span className="saved-state">{savedDraft ? "Saved locally" : "Unsaved session"}</span>
         </div>
 
         <div className="top-actions">
@@ -1328,22 +1371,30 @@ export default function Home() {
                 >
                   <svg className="edge-layer" width={CANVAS_WIDTH} height={CANVAS_HEIGHT}>
                     <defs>
-                      <marker
-                        id="edge-arrow"
-                        viewBox="0 0 10 10"
-                        refX="9"
-                        refY="5"
-                        markerWidth="6"
-                        markerHeight="6"
-                        orient="auto-start-reverse"
-                      >
-                        <path d="M 0 0 L 10 5 L 0 10 z" />
-                      </marker>
+                      {[...new Set(provider.services.map((service) => service.accent))].map(
+                        (accent) => (
+                          <marker
+                            key={accent}
+                            id={edgeMarkerId(provider.id, accent)}
+                            viewBox="0 0 10 10"
+                            refX="9"
+                            refY="5"
+                            markerWidth="6"
+                            markerHeight="6"
+                            orient="auto-start-reverse"
+                          >
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill={accent} />
+                          </marker>
+                        ),
+                      )}
                     </defs>
                     {edges.map((edge) => {
                       const from = nodeById.get(edge.from);
                       const to = nodeById.get(edge.to);
                       if (!from || !to) return null;
+                      const fromService = serviceById(provider, from.serviceId);
+                      const toService = serviceById(provider, to.serviceId);
+                      const accent = fromService?.accent ?? provider.accent;
                       const x1 = from.x + NODE_WIDTH;
                       const y1 = from.y + NODE_HEIGHT / 2;
                       const x2 = to.x;
@@ -1355,14 +1406,20 @@ export default function Home() {
                         <g
                           key={edge.id}
                           className={`edge ${active ? "selected" : ""}`}
+                          style={{ "--edge-color": accent } as CSSProperties}
                           onClick={(event) => {
                             event.stopPropagation();
                             setSelectedEdgeId(edge.id);
                             setSelection([]);
                           }}
                         >
+                          <title>{`${from.values.name || fromService?.name || "Resource"} to ${to.values.name || toService?.name || "resource"}`}</title>
                           <path className="edge-hit" d={path} />
-                          <path className="edge-line" d={path} markerEnd="url(#edge-arrow)" />
+                          <path
+                            className="edge-line"
+                            d={path}
+                            markerEnd={`url(#${edgeMarkerId(provider.id, accent)})`}
+                          />
                         </g>
                       );
                     })}
@@ -1371,6 +1428,8 @@ export default function Home() {
                       (() => {
                         const source = nodeById.get(connectionStart);
                         if (!source) return null;
+                        const sourceService = serviceById(provider, source.serviceId);
+                        const accent = sourceService?.accent ?? provider.accent;
                         const x1 =
                           connectionSide === "input" ? source.x : source.x + NODE_WIDTH;
                         const y1 = source.y + NODE_HEIGHT / 2;
@@ -1382,8 +1441,9 @@ export default function Home() {
                         return (
                           <path
                             className="pending-edge"
+                            style={{ "--edge-color": accent } as CSSProperties}
                             d={`M ${x1} ${y1} C ${x1 + curve * direction} ${y1}, ${connectionPointer.x - curve * direction} ${connectionPointer.y}, ${connectionPointer.x} ${connectionPointer.y}`}
-                            markerEnd="url(#edge-arrow)"
+                            markerEnd={`url(#${edgeMarkerId(provider.id, accent)})`}
                           />
                         );
                       })()}
@@ -1555,6 +1615,7 @@ export default function Home() {
                       const from = nodeById.get(edge.from);
                       const to = nodeById.get(edge.to);
                       if (!from || !to) return null;
+                      const fromService = serviceById(provider, from.serviceId);
                       return (
                         <line
                           key={edge.id}
@@ -1562,6 +1623,11 @@ export default function Home() {
                           y1={from.y - bounds.minY + 80 + NODE_HEIGHT / 2}
                           x2={to.x - bounds.minX + 80 + NODE_WIDTH / 2}
                           y2={to.y - bounds.minY + 80 + NODE_HEIGHT / 2}
+                          style={
+                            {
+                              "--edge-color": fromService?.accent ?? provider.accent,
+                            } as CSSProperties
+                          }
                         />
                       );
                     })}
@@ -1808,10 +1874,12 @@ export default function Home() {
       {providerPickerOpen && (
         <div className="modal-backdrop provider-modal-backdrop" role="presentation">
           <section
+            ref={providerDialogRef}
             className="provider-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="provider-title"
+            tabIndex={-1}
           >
             <div className="modal-brand">
               <span className="brand-symbol">
@@ -1847,6 +1915,81 @@ export default function Home() {
                 </button>
               ))}
             </div>
+            {!storageReady && nodes.length === 0 && (
+              <div className="session-loading" aria-live="polite">Checking for a saved diagram…</div>
+            )}
+            {storageReady && nodes.length === 0 && (
+              <section className="session-chooser" aria-labelledby="session-choice-title">
+                <div className="session-choice-heading">
+                  <span id="session-choice-title">Choose how to begin</span>
+                  <small>Nothing is loaded until you choose an option.</small>
+                </div>
+                <div className={`session-choice-grid ${savedDraft ? "has-saved-draft" : ""}`}>
+                  {savedDraft && (
+                    <button
+                      className="session-choice saved-choice"
+                      onClick={resumeSavedDraft}
+                      style={
+                        {
+                          "--choice-accent": providerById(savedDraft.providerId).accent,
+                        } as CSSProperties
+                      }
+                    >
+                      <span className="session-choice-icon">
+                        <ProviderMark
+                          provider={savedDraft.providerId}
+                          className="session-provider-mark"
+                        />
+                      </span>
+                      <span className="session-choice-copy">
+                        <small>Saved in this browser</small>
+                        <strong>{savedDraft.projectName}</strong>
+                        <em>
+                          {providerById(savedDraft.providerId).shortName} · {savedDraft.nodes.length}{" "}
+                          resources · {savedDraft.edges.length} connections
+                        </em>
+                      </span>
+                      <b>Resume</b>
+                    </button>
+                  )}
+                  <button
+                    className={`session-choice blank-choice ${!savedDraft ? "recommended" : ""}`}
+                    onClick={() => applyProvider(provider.id, false)}
+                    style={{ "--choice-accent": "#725cf5" } as CSSProperties}
+                  >
+                    <span className="session-choice-icon blank-canvas-icon" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                    <span className="session-choice-copy">
+                      <small>{!savedDraft ? "Recommended" : "Clean workspace"}</small>
+                      <strong>Start new</strong>
+                      <em>Open a blank {provider.shortName} canvas</em>
+                    </span>
+                    <b>Blank</b>
+                  </button>
+                  <button
+                    className="session-choice example-choice"
+                    onClick={() => applyProvider(provider.id, true)}
+                    style={{ "--choice-accent": provider.accent } as CSSProperties}
+                  >
+                    <span className="session-choice-icon">
+                      <ProviderMark provider={provider.id} className="session-provider-mark" />
+                    </span>
+                    <span className="session-choice-copy">
+                      <small>Production reference</small>
+                      <strong>Load secure example</strong>
+                      <em>
+                        {SAMPLE_ARCHITECTURES[provider.id].length} configured {provider.shortName}{" "}
+                        resources
+                      </em>
+                    </span>
+                    <b>Example</b>
+                  </button>
+                </div>
+              </section>
+            )}
             <div className="provider-modal-footer">
               <span>
                 <i /> Real provider resources

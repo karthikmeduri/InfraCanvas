@@ -158,6 +158,50 @@ test("AWS secure reference architecture is complete and wires protected private 
   );
 });
 
+test("every cloud ships a complete production reference architecture", () => {
+  for (const provider of providers) {
+    const layout = SAMPLE_ARCHITECTURES[provider.id];
+    const nodes = layout.map((entry, index) => {
+      const service = provider.services.find((item) => item.id === entry.serviceId);
+      assert.ok(service, `${provider.id} sample uses a catalog service: ${entry.serviceId}`);
+      return {
+        id: `${entry.serviceId}-${index}`,
+        serviceId: entry.serviceId,
+        x: entry.x,
+        y: entry.y,
+        values: { ...defaultValues(service, index + 1), ...entry.values },
+      };
+    });
+    const edges = SAMPLE_EDGES[provider.id].map(([from, to], index) => {
+      assert.ok(nodes[from], `${provider.id} sample edge ${index} has a source`);
+      assert.ok(nodes[to], `${provider.id} sample edge ${index} has a target`);
+      return { id: `sample-edge-${index}`, from: nodes[from].id, to: nodes[to].id };
+    });
+    const expectedCategories = [
+      ...new Set(provider.services.map((service) => service.category)),
+    ].sort();
+    const sampleCategories = [
+      ...new Set(
+        nodes.map(
+          (node) =>
+            provider.services.find((service) => service.id === node.serviceId).category,
+        ),
+      ),
+    ].sort();
+
+    assert.deepEqual(
+      sampleCategories,
+      expectedCategories,
+      `${provider.shortName} sample demonstrates every available category`,
+    );
+    assert.ok(nodes.length >= 18, `${provider.shortName} sample is production-scale`);
+    assert.ok(edges.length >= nodes.length, `${provider.shortName} sample has meaningful wiring`);
+
+    const result = generate(provider, nodes, edges, `${provider.shortName} production reference`);
+    assert.equal(result.unresolved.length, 0, `${provider.shortName} sample resolves every reference`);
+  }
+});
+
 test(HCL_TOOL ? `${HCL_TOOL} fmt accepts the generated files` : "hcl formatter check (skipped)", async (t) => {
   if (!HCL_TOOL) {
     t.skip("neither tofu nor terraform is on PATH");

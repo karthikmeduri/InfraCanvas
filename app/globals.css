@@ -914,19 +914,13 @@ select:focus-visible {
 
 .edge-layer path:not([d^="M 0"]) {
   fill: none;
-  stroke: #9b96b9;
-  stroke-width: 1.5;
-}
-
-.edge-layer marker path {
-  fill: #8c87ad;
 }
 
 .edge-layer .pending-edge {
-  stroke: #725cf5;
+  stroke: var(--edge-color, #725cf5);
   stroke-width: 2.5;
   stroke-dasharray: 8 5;
-  filter: drop-shadow(0 2px 3px rgba(114, 92, 245, 0.28));
+  filter: drop-shadow(0 2px 3px var(--edge-color, rgba(114, 92, 245, 0.28)));
   animation: pending-edge-flow 0.75s linear infinite;
 }
 

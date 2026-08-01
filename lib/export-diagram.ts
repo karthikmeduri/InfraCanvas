@@ -47,6 +47,18 @@ export function diagramToSvg(
   const height = Math.max(320, maxY - minY + PADDING * 2 + 44);
 
   const positioned = new Map(nodes.map((node) => [node.id, node]));
+  const markerIdFor = (accent: string) =>
+    `arrow-${accent.replace(/[^a-z0-9]/gi, "")}`;
+  const edgeAccents = [
+    ...new Set([...provider.services.map((service) => service.accent), palette.edge]),
+  ];
+  const edgeMarkers = edgeAccents
+    .map(
+      (accent) => `<marker id="${markerIdFor(accent)}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="${accent}" />
+    </marker>`,
+    )
+    .join("\n    ");
 
   const edgePaths = edges
     .map((edge) => {
@@ -58,7 +70,8 @@ export function diagramToSvg(
       const x2 = to.x + offsetX;
       const y2 = to.y + offsetY + NODE_HEIGHT / 2;
       const curve = Math.max(60, Math.abs(x2 - x1) * 0.45);
-      return `<path d="M ${x1} ${y1} C ${x1 + curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}" fill="none" stroke="${palette.edge}" stroke-width="2" marker-end="url(#arrow)" />`;
+      const accent = serviceFor(from)?.accent ?? palette.edge;
+      return `<path d="M ${x1} ${y1} C ${x1 + curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}" fill="none" stroke="${accent}" stroke-width="2" opacity="0.82" marker-end="url(#${markerIdFor(accent)})" />`;
     })
     .join("\n    ");
 
@@ -85,9 +98,7 @@ export function diagramToSvg(
     <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
       <circle cx="1" cy="1" r="1" fill="${palette.grid}" />
     </pattern>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="${palette.edge}" />
-    </marker>
+    ${edgeMarkers}
   </defs>
   <rect width="${width}" height="${height}" fill="${palette.bg}" />
   <rect width="${width}" height="${height}" fill="url(#grid)" />

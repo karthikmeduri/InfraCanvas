@@ -93,6 +93,25 @@ test("the diagram exports as well-formed standalone SVG", () => {
   assert.doesNotMatch(svg, /https?:\/\/(?!www\.w3\.org)/);
 });
 
+test("diagram connections inherit the source resource color", () => {
+  const ec2 = aws.services.find((service) => service.id === "ec2");
+  const rds = aws.services.find((service) => service.id === "rds");
+  const nodes = [
+    { id: "compute", serviceId: ec2.id, x: 0, y: 0, values: defaultValues(ec2, 1) },
+    { id: "database", serviceId: rds.id, x: 300, y: 0, values: defaultValues(rds, 2) },
+  ];
+  const edges = [
+    { id: "compute-to-database", from: "compute", to: "database" },
+    { id: "database-to-compute", from: "database", to: "compute" },
+  ];
+  const svg = diagramToSvg(aws, nodes, edges, "Directional colors", "dark");
+
+  assert.match(svg, new RegExp(`stroke="${ec2.accent}"`));
+  assert.match(svg, new RegExp(`stroke="${rds.accent}"`));
+  assert.match(svg, new RegExp(`marker-end="url\\(#arrow-${ec2.accent.slice(1)}\\)"`));
+  assert.match(svg, new RegExp(`marker-end="url\\(#arrow-${rds.accent.slice(1)}\\)"`));
+});
+
 test("validation flags an unconnected database and an open firewall", () => {
   const rds = aws.services.find((service) => service.id === "rds");
   const sg = aws.services.find((service) => service.id === "security_group");
