@@ -10,7 +10,7 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run build && npm run test:generator && node --test tests/rendered-html.test.mjs",
-    "test:generator": "esbuild build/test-entry/generator.ts --bundle --format=esm --platform=node --outfile=dist/generator-test-bundle.mjs && node --test tests/terraform-generation.test.mjs tests/exports.test.mjs",
+    "test:generator": "esbuild build/test-entry/generator.ts --bundle --format=esm --platform=node --outfile=dist/generator-test-bundle.mjs && node --test tests/terraform-generation.test.mjs tests/exports.test.mjs tests/drift-integration.test.mjs",
     "emit:terraform": "node scripts/emit-terraform.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",

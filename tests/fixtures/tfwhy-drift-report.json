@@ -1,0 +1,24 @@
+{
+  "counts": {},
+  "errored": false,
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "address": "aws_db_instance.reports",
+      "type": "aws_db_instance",
+      "action": "delete",
+      "title": "aws_db_instance.reports was DELETED outside of Terraform",
+      "detail": "The real object no longer exists. The next apply will recreate it (or error if it can't).",
+      "stateful": true
+    },
+    {
+      "severity": "MEDIUM",
+      "address": "aws_security_group.web",
+      "type": "aws_security_group",
+      "action": "update",
+      "title": "aws_security_group.web was modified outside of Terraform",
+      "detail": "Drifted attributes: ingress",
+      "stateful": false
+    }
+  ]
+}

@@ -19,6 +19,14 @@ import {
   serviceById,
 } from "@/lib/catalog";
 import { defaultValues } from "@/lib/catalog/helpers";
+import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
+import {
+  canvasTerraformResources,
+  highestDriftSeverity,
+  matchDriftFindings,
+  parseTfwhyReport,
+  type TfwhyFinding,
+} from "@/lib/drift";
 import { diagramToSvg, svgToPngBlob } from "@/lib/export-diagram";
 import { safeName } from "@/lib/hcl";
 import { HighlightedCode } from "@/lib/highlight";
@@ -113,6 +121,9 @@ export default function Home() {
   const [marquee, setMarquee] = useState<Marquee | null>(null);
 
   const [codeOpen, setCodeOpen] = useState(false);
+  const [driftOpen, setDriftOpen] = useState(false);
+  const [driftReport, setDriftReport] = useState<LoadedReport | null>(null);
+  const [driftImportError, setDriftImportError] = useState("");
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
@@ -128,6 +139,7 @@ export default function Home() {
   const providerDialogRef = useRef<HTMLElement>(null);
   const decisionDialogRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const driftInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{
     pointerId: number;
     origins: Map<string, { x: number; y: number }>;
@@ -165,6 +177,14 @@ export default function Home() {
   const issues = validateDiagram(provider, nodes, edges);
   const errorCount = issues.filter((issue) => issue.severity === "error").length;
   const warningCount = issues.filter((issue) => issue.severity === "warning").length;
+  const driftMatches = driftReport
+    ? matchDriftFindings(driftReport.report, canvasTerraformResources(provider, nodes))
+    : [];
+  const driftByNode = new Map<string, TfwhyFinding[]>();
+  driftMatches.forEach(({ finding, nodeId }) => {
+    if (!nodeId) return;
+    driftByNode.set(nodeId, [...(driftByNode.get(nodeId) ?? []), finding]);
+  });
 
   const currentFile =
     generated.files.find((file) => file.path === activeFile) ?? generated.files[0];
@@ -227,6 +247,31 @@ export default function Home() {
   };
 
   const notify = (message: string) => setToast(message);
+
+  const importDriftFile = async (file?: File) => {
+    if (!file) return;
+    setDriftImportError("");
+    if (file.size > 5 * 1024 * 1024) {
+      setDriftImportError("The report is larger than 5 MB. Import TFwhy's JSON output, not a Terraform state file.");
+      return;
+    }
+    try {
+      const report = parseTfwhyReport(await file.text());
+      setDriftReport({ report, fileName: file.name, importedAt: new Date().toISOString() });
+      setDriftOpen(true);
+      setCodeOpen(false);
+      notify(`${report.findings.length} TFwhy drift findings imported locally`);
+    } catch (error) {
+      setDriftImportError(error instanceof Error ? error.message : "Unable to read this TFwhy report.");
+    }
+  };
+
+  const clearDriftReport = () => {
+    setDriftReport(null);
+    setDriftImportError("");
+    if (driftInputRef.current) driftInputRef.current.value = "";
+    notify("Drift report cleared from this tab");
+  };
 
   /* ---------------------------------------------------------------- effects */
   // Discover a saved draft without restoring it automatically. Every browser
@@ -440,6 +485,9 @@ export default function Home() {
       setPendingProvider(null);
       setStartupProvider(null);
       setCodeOpen(false);
+      setDriftOpen(false);
+      setDriftReport(null);
+      setDriftImportError("");
       setSearch("");
       if (withSample) {
         loadSample(nextId);
@@ -489,6 +537,9 @@ export default function Home() {
     setSelectedEdgeId(null);
     setProviderPickerOpen(false);
     setCodeOpen(false);
+    setDriftOpen(false);
+    setDriftReport(null);
+    setDriftImportError("");
     setStartupProvider(null);
     setExamplePromptOpen(false);
     notify(`Resumed ${savedDraft.projectName}`);
@@ -556,6 +607,8 @@ export default function Home() {
     setSelection([]);
     setSelectedEdgeId(null);
     setZoom(1);
+    setDriftReport(null);
+    setDriftImportError("");
     setExamplePromptOpen(true);
     notify("Canvas cleared");
   };
@@ -660,6 +713,16 @@ export default function Home() {
         behavior: "smooth",
       });
     };
+
+  const focusDriftNode = (nodeId: string) => {
+    setDriftOpen(false);
+    setCodeOpen(false);
+    setSelection([nodeId]);
+    setSelectedEdgeId(null);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => revealNode(nodeId));
+    });
+  };
 
   const focusValidationIssue = (issue: ValidationIssue) => {
     setIssuesOpen(true);
@@ -1247,7 +1310,27 @@ export default function Home() {
           <button className="ghost-button" onClick={saveProject}>
             Save
           </button>
-          <button className="generate-button" onClick={() => setCodeOpen((current) => !current)}>
+          <button
+            className={`drift-nav-button ${driftOpen ? "active" : ""}`}
+            onClick={() => {
+              setCodeOpen(false);
+              setDriftOpen((current) => !current);
+            }}
+            aria-pressed={driftOpen}
+            title="Import and inspect a TFwhy drift report"
+          >
+            <span className="drift-nav-icon" aria-hidden="true"><i /><i /><i /></span>
+            Drift
+            {driftReport && <b>{driftReport.report.findings.length}</b>}
+          </button>
+          <button
+            className="generate-button"
+            onClick={() => {
+              if (codeOpen) return setCodeOpen(false);
+              setDriftOpen(false);
+              setCodeOpen(true);
+            }}
+          >
             <span className="code-glyph" aria-hidden="true">
               {codeOpen ? "←" : "</>"}
             </span>
@@ -1256,6 +1339,19 @@ export default function Home() {
           </button>
         </div>
       </header>
+
+      <input
+        ref={driftInputRef}
+        className="visually-hidden"
+        type="file"
+        accept="application/json,.json"
+        onChange={(event) => {
+          void importDriftFile(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
 
       <div className="workflow-bar">
         <ol className="workflow-steps" aria-label="Builder workflow">
@@ -1290,7 +1386,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!codeOpen && (
+      {!codeOpen && !driftOpen && (
         <section className="workspace">
           <aside className={`library-panel ${mobileLibraryOpen ? "mobile-open" : ""}`}>
             <div className="panel-heading provider-heading">
@@ -1631,6 +1727,8 @@ export default function Home() {
                     const selected = selection.includes(node.id);
                     const nodeIssues = issues.filter((issue) => issue.nodeId === node.id);
                     const focusedIssue = nodeIssues.find((issue) => issue.id === activeIssueId);
+                    const nodeDrift = driftByNode.get(node.id) ?? [];
+                    const driftSeverity = highestDriftSeverity(nodeDrift);
                     const worst = nodeIssues.some((issue) => issue.severity === "error")
                       ? "error"
                       : nodeIssues.length > 0
@@ -1639,7 +1737,7 @@ export default function Home() {
                     return (
                       <div
                         key={node.id}
-                        className={`diagram-node ${selected ? "selected" : ""} ${focusedIssue ? `validation-focus validation-${focusedIssue.severity}` : ""} ${connectionStart === node.id ? "connection-start" : ""} status-${worst}`}
+                        className={`diagram-node ${selected ? "selected" : ""} ${focusedIssue ? `validation-focus validation-${focusedIssue.severity}` : ""} ${connectionStart === node.id ? "connection-start" : ""} ${driftSeverity ? `has-drift drift-${driftSeverity.toLowerCase()}` : ""} status-${worst}`}
                         style={
                           {
                             left: node.x,
@@ -1701,6 +1799,14 @@ export default function Home() {
                               : nodeIssues.map((issue) => issue.title).join(" · ")
                           }
                         />
+                        {driftSeverity && (
+                          <span
+                            className="node-drift-badge"
+                            title={`${nodeDrift.length} TFwhy drift ${nodeDrift.length === 1 ? "finding" : "findings"}`}
+                          >
+                            {nodeDrift.length}
+                          </span>
+                        )}
                         <span
                           className="node-port output-port"
                           role="button"
@@ -2303,6 +2409,19 @@ export default function Home() {
             <button onClick={() => setShortcutsOpen(false)}>Close</button>
           </section>
         </div>
+      )}
+
+      {driftOpen && (
+        <DriftWorkspace
+          loaded={driftReport}
+          matches={driftMatches}
+          error={driftImportError}
+          onBack={() => setDriftOpen(false)}
+          onImport={() => driftInputRef.current?.click()}
+          onClear={clearDriftReport}
+          onFocusNode={focusDriftNode}
+          onCopy={copyText}
+        />
       )}
 
       {codeOpen && (

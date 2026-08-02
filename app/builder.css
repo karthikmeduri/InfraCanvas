@@ -196,6 +196,70 @@ body {
   border-color: var(--hairline-strong);
 }
 
+.visually-hidden {
+  position: fixed !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.drift-nav-button {
+  min-height: 38px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--ok) 34%, var(--hairline));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ok) 7%, var(--panel));
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.drift-nav-button:hover,
+.drift-nav-button.active {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--ok) 70%, var(--hairline));
+  background: color-mix(in srgb, var(--ok) 14%, var(--panel));
+}
+
+.drift-nav-button b {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ok);
+  color: white;
+  font-size: 9px;
+}
+
+.drift-nav-icon,
+.drift-mark {
+  display: inline-flex;
+  align-items: end;
+  gap: 2px;
+}
+
+.drift-nav-icon i,
+.drift-mark i {
+  width: 3px;
+  border-radius: 3px;
+  background: var(--ok);
+}
+
+.drift-nav-icon i:nth-child(1), .drift-mark i:nth-child(1) { height: 7px; }
+.drift-nav-icon i:nth-child(2), .drift-mark i:nth-child(2) { height: 13px; }
+.drift-nav-icon i:nth-child(3), .drift-mark i:nth-child(3) { height: 9px; }
+
 .theme-switcher {
   display: inline-flex;
   align-items: center;
@@ -593,6 +657,38 @@ body {
 
 .diagram-node:hover::after {
   opacity: 1;
+}
+
+.diagram-node.has-drift {
+  --drift-color: var(--warn);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--drift-color) 30%, transparent),
+    0 8px 24px color-mix(in srgb, var(--drift-color) 18%, transparent);
+}
+
+.diagram-node.drift-critical { --drift-color: #ff3d61; }
+.diagram-node.drift-high { --drift-color: #ff7043; }
+.diagram-node.drift-medium { --drift-color: #f5a524; }
+.diagram-node.drift-low { --drift-color: #4aa8ff; }
+.diagram-node.drift-info { --drift-color: #8b93a7; }
+
+.node-drift-badge {
+  position: absolute;
+  z-index: 3;
+  right: -8px;
+  top: -9px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--panel);
+  border-radius: 999px;
+  background: var(--drift-color);
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--drift-color) 40%, transparent);
 }
 
 /* Edges become selectable: a fat transparent path widens the hit area. */
@@ -1166,6 +1262,375 @@ body {
   background: var(--violet);
 }
 
+/* --- TFwhy drift workspace ------------------------------------------------ */
+
+.drift-page {
+  height: calc(100vh - 108px);
+  overflow: auto;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 2%, color-mix(in srgb, var(--ok) 11%, transparent), transparent 30%),
+    radial-gradient(circle at 92% 4%, color-mix(in srgb, var(--violet) 10%, transparent), transparent 32%),
+    var(--app-bg);
+}
+
+.drift-header {
+  min-height: 76px;
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.drift-header > div,
+.drift-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drift-header small,
+.drift-header h2 {
+  display: block;
+  margin: 0;
+}
+
+.drift-header small {
+  color: var(--text-faint);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.drift-header h2 {
+  margin-top: 2px;
+  font: 720 20px/1.1 "Space Grotesk", "Segoe UI", sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.drift-mark {
+  width: 39px;
+  height: 39px;
+  padding: 10px 9px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--hairline));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--ok) 12%, var(--panel-2));
+}
+
+.drift-mark i { width: 4px; }
+
+.drift-import-button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--ok) 82%, #0e3e24);
+  border-radius: 9px;
+  background: linear-gradient(135deg, #23b768, #12834a);
+  color: white;
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow: 0 7px 18px rgba(18, 131, 74, 0.2);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.drift-import-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 25px rgba(18, 131, 74, 0.28);
+}
+
+.drift-import-button.large { min-height: 44px; padding: 0 20px; }
+
+.drift-privacy-strip {
+  min-height: 44px;
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ok) 20%, var(--hairline));
+  background: color-mix(in srgb, var(--ok) 7%, var(--panel));
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.drift-privacy-strip > span { color: var(--ok); font-size: 18px; }
+.drift-privacy-strip p { margin: 0; }
+.drift-privacy-strip strong { color: var(--text); }
+
+.drift-onboarding,
+.drift-results {
+  width: min(1180px, calc(100% - 36px));
+  margin: 22px auto 40px;
+}
+
+.drift-onboarding {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.8fr);
+  gap: 14px;
+}
+
+.drift-hero-card,
+.drift-command-card,
+.drift-summary-card,
+.drift-findings-panel,
+.drift-report-warning {
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  box-shadow: 0 12px 34px rgba(21, 24, 36, 0.06);
+}
+
+.drift-hero-card {
+  grid-row: span 2;
+  min-height: 390px;
+  padding: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.drift-hero-card::after {
+  content: "";
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  right: -80px;
+  bottom: -100px;
+  border: 48px solid color-mix(in srgb, var(--ok) 8%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.drift-hero-card .eyebrow {
+  margin-bottom: 16px;
+  color: var(--ok);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+}
+
+.drift-hero-card h3 {
+  max-width: 570px;
+  margin: 0;
+  font: 740 clamp(28px, 4vw, 46px)/1.02 "Space Grotesk", "Segoe UI", sans-serif;
+  letter-spacing: -0.045em;
+}
+
+.drift-hero-card > p {
+  max-width: 620px;
+  margin: 18px 0 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.drift-flow {
+  width: 100%;
+  margin: 0 0 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drift-flow span {
+  min-height: 46px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.drift-flow b {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--ok) 14%, var(--panel));
+  color: var(--ok);
+}
+
+.drift-flow i { color: var(--text-faint); font-style: normal; }
+
+.drift-error {
+  margin: 12px 0 0 !important;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--hairline));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
+  color: var(--danger) !important;
+}
+
+.drift-command-card {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.drift-command-card > div { display: flex; gap: 11px; }
+.drift-command-card > div > span:last-child { display: grid; gap: 3px; }
+.drift-command-card strong { font-size: 12px; }
+.drift-command-card small { color: var(--text-muted); font-size: 10px; line-height: 1.45; }
+.command-index { color: var(--ok); font: 800 10px ui-monospace, monospace; }
+
+.drift-command-card pre {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: #10131b;
+  color: #a9e8c4;
+  font: 10px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.drift-command-card button {
+  justify-self: start;
+  padding: 7px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.drift-summary-grid {
+  display: grid;
+  grid-template-columns: 1.7fr repeat(4, minmax(100px, 0.65fr)) 1fr;
+  gap: 10px;
+}
+
+.drift-summary-card {
+  min-height: 104px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-top: 3px solid var(--hairline);
+}
+
+.drift-summary-card small { color: var(--text-faint); font-size: 8.5px; font-weight: 800; letter-spacing: 0.1em; }
+.drift-summary-card strong { font: 760 28px/1 "Space Grotesk", sans-serif; }
+.drift-summary-card span { color: var(--text-muted); font-size: 9.5px; }
+.drift-summary-card em { color: var(--text-faint); font-size: 14px; font-style: normal; }
+.drift-summary-card.severity-critical { border-top-color: #ff3d61; }
+.drift-summary-card.severity-high { border-top-color: #ff7043; }
+.drift-summary-card.severity-medium { border-top-color: #f5a524; }
+.drift-summary-card.severity-low { border-top-color: #4aa8ff; }
+.drift-summary-card.match-card { border-top-color: var(--ok); }
+.drift-summary-card.report-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+
+.drift-report-warning {
+  margin-top: 12px;
+  padding: 12px 15px;
+  display: grid;
+  gap: 4px;
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--hairline));
+  background: color-mix(in srgb, var(--warn) 8%, var(--panel));
+  font-size: 10.5px;
+}
+
+.drift-findings-panel { margin-top: 14px; overflow: hidden; }
+
+.drift-findings-panel > header {
+  min-height: 70px;
+  padding: 14px 17px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.drift-findings-panel h3 { margin: 2px 0 0; font-size: 16px; }
+.drift-findings-panel header small { color: var(--text-faint); font-size: 8px; font-weight: 800; letter-spacing: 0.12em; }
+.drift-filters { display: flex; gap: 8px; }
+
+.drift-filters select {
+  min-height: 34px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 10px;
+}
+
+.drift-finding-list { display: grid; }
+
+.drift-finding {
+  --finding-color: var(--text-faint);
+  min-height: 104px;
+  padding: 16px 17px;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: inset 3px 0 0 var(--finding-color);
+}
+
+.drift-finding:last-child { border-bottom: 0; }
+.drift-finding.severity-critical { --finding-color: #ff3d61; }
+.drift-finding.severity-high { --finding-color: #ff7043; }
+.drift-finding.severity-medium { --finding-color: #f5a524; }
+.drift-finding.severity-low { --finding-color: #4aa8ff; }
+.drift-finding.severity-info { --finding-color: #8b93a7; }
+
+.drift-severity {
+  width: fit-content;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--finding-color) 38%, var(--hairline));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--finding-color) 10%, var(--panel));
+  color: var(--finding-color);
+  font-size: 8.5px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+}
+
+.drift-finding-body { min-width: 0; display: grid; gap: 7px; }
+.drift-finding-body > div { display: flex; align-items: center; gap: 7px; }
+.drift-finding-body code { overflow: hidden; text-overflow: ellipsis; color: var(--violet); font: 600 10px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.drift-finding-body strong { font-size: 12px; }
+.drift-finding-body p { margin: 0; color: var(--text-muted); font-size: 10.5px; line-height: 1.5; }
+.drift-finding-body small { color: var(--text-faint); font-size: 9px; }
+.drift-action, .stateful-pill, .unmatched-pill { padding: 3px 6px; border-radius: 5px; background: var(--panel-2); color: var(--text-muted); font-size: 8.5px; font-weight: 700; white-space: nowrap; }
+.stateful-pill { background: color-mix(in srgb, var(--warn) 10%, var(--panel-2)); color: var(--warn); }
+.unmatched-pill { color: var(--text-faint); }
+
+.locate-node-button {
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--ok) 28%, var(--hairline));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ok) 7%, var(--panel));
+  color: var(--ok);
+  font-size: 9.5px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.drift-empty-result { min-height: 180px; display: grid; place-content: center; gap: 5px; text-align: center; }
+.drift-empty-result span { color: var(--text-muted); font-size: 10px; }
+
 /* --- code workspace ------------------------------------------------------- */
 
 .code-callout.warn {
@@ -1289,6 +1754,46 @@ body {
     white-space: nowrap;
     border: 0;
   }
+
+  .drift-nav-button {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .drift-nav-button b {
+    position: absolute;
+    margin: -25px -24px 0 0;
+    font-size: 8px;
+  }
+
+  .drift-onboarding { grid-template-columns: 1fr; }
+  .drift-hero-card { grid-row: auto; min-height: 330px; padding: 28px; }
+  .drift-summary-grid { grid-template-columns: repeat(3, 1fr); }
+  .drift-summary-card.report-card { grid-column: span 2; }
+  .drift-finding { grid-template-columns: 70px minmax(0, 1fr); }
+  .drift-finding > :last-child { grid-column: 2; justify-self: start; }
+}
+
+@media (max-width: 620px) {
+  .drift-header { align-items: flex-start; padding: 12px; }
+  .drift-header .ghost-button { display: none; }
+  .drift-header h2 { font-size: 16px; }
+  .drift-header-actions { align-self: center; }
+  .drift-import-button { padding: 0 10px; font-size: 10px; }
+  .drift-privacy-strip { padding: 9px 14px; align-items: flex-start; }
+  .drift-onboarding, .drift-results { width: calc(100% - 20px); margin-top: 10px; }
+  .drift-hero-card { padding: 24px; }
+  .drift-flow { align-items: stretch; flex-direction: column; }
+  .drift-flow i { display: none; }
+  .drift-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .drift-summary-card.report-card, .drift-summary-card.match-card { grid-column: span 2; }
+  .drift-findings-panel > header { align-items: flex-start; flex-direction: column; }
+  .drift-filters { width: 100%; }
+  .drift-filters select { width: 50%; }
+  .drift-finding { padding: 14px; grid-template-columns: 1fr; }
+  .drift-finding > :last-child { grid-column: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

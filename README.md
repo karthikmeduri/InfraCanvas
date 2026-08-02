@@ -159,6 +159,32 @@ also accept any region-supported custom instance type.
 - **Dark mode** — applied before first paint, no flash
 - **Keyboard-first** — press <kbd>?</kbd> for the full map
 
+## TFwhy drift detection
+
+InfraCanvas integrates with [TFwhy](https://github.com/karthikmeduri91/tfwhy) to close the
+gap between the architecture you designed and the infrastructure that actually exists.
+Click **Drift** in the builder, run TFwhy beside your Terraform project, and import the
+generated JSON report. InfraCanvas matches Terraform addresses to canvas nodes, adds
+severity badges, and lets you jump from a finding directly to the affected resource.
+
+```bash
+# Fresh scan: Terraform refreshes the provider state, TFwhy analyzes the drift
+tfwhy drift --chdir . --json > tfwhy-drift.json
+```
+
+For a fully offline TFwhy analysis step, create the refreshed plan first and then pass its
+JSON to TFwhy:
+
+```bash
+terraform plan -refresh-only -out=tfplan
+terraform show -json tfplan > plan.json
+tfwhy drift plan.json --offline --json > tfwhy-drift.json
+```
+
+The report is parsed entirely in the browser tab. InfraCanvas does not upload the report,
+Terraform state, or cloud credentials, and it deliberately does not execute Terraform in
+the hosted web application. See [the integration and security model](docs/tfwhy-integration.md).
+
 <details>
 <summary><b>Keyboard shortcuts</b></summary>
 
@@ -283,7 +309,7 @@ resolver picks it up automatically. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - [ ] Cost estimates per node
 - [ ] Reusable module output instead of a flat file set
 - [ ] Shareable project links and team workspaces
-- [ ] `terraform plan` visualisation
+- [x] TFwhy drift report visualisation and canvas highlighting
 
 ## Contributing
 

@@ -8,3 +8,10 @@ export { generate } from "../../lib/terraform/generate";
 export { validateDiagram } from "../../lib/validate";
 export { createZip } from "../../lib/zip";
 export { diagramToSvg } from "../../lib/export-diagram";
+export {
+  canvasTerraformResources,
+  highestDriftSeverity,
+  matchDriftFindings,
+  normalizeTerraformAddress,
+  parseTfwhyReport,
+} from "../../lib/drift";
