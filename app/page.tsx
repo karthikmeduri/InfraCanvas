@@ -288,15 +288,17 @@ export default function Home() {
   }, [examplePromptOpen, pendingProvider, startupProvider]);
 
   useEffect(() => {
-    if (providerPickerOpen || codeOpen) return;
+    if (providerPickerOpen || codeOpen || nodes.length > 0) return;
     const frame = window.requestAnimationFrame(() => {
       const canvas = canvasRef.current;
-      if (canvas && canvas.scrollLeft === 0 && canvas.scrollTop === 0) {
-        canvas.scrollTo({ left: CANVAS_PAN_PADDING, top: CANVAS_PAN_PADDING });
-      }
+      if (!canvas) return;
+      canvas.scrollTo({
+        left: Math.max(0, (CANVAS_WIDTH * zoom - canvas.clientWidth) / 2),
+        top: Math.max(0, (CANVAS_HEIGHT * zoom - canvas.clientHeight) / 2),
+      });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [codeOpen, providerId, providerPickerOpen]);
+  }, [codeOpen, nodes.length, providerId, providerPickerOpen, zoom]);
 
   /* --------------------------------------------------------------- commands */
   const addNode =
@@ -446,14 +448,6 @@ export default function Home() {
         setSelection([]);
         setSelectedEdgeId(null);
         setZoom(1);
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => {
-            canvasRef.current?.scrollTo({
-              left: CANVAS_PAN_PADDING,
-              top: CANVAS_PAN_PADDING,
-            });
-          });
-        });
         setExamplePromptOpen(true);
         notify(`${definition.shortName} blank canvas ready`);
       }
@@ -563,14 +557,6 @@ export default function Home() {
     setSelectedEdgeId(null);
     setZoom(1);
     setExamplePromptOpen(true);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        canvasRef.current?.scrollTo({
-          left: CANVAS_PAN_PADDING,
-          top: CANVAS_PAN_PADDING,
-        });
-      });
-    });
     notify("Canvas cleared");
   };
 
@@ -1751,7 +1737,9 @@ export default function Home() {
 
                 </div>
               </div>
+            </div>
 
+            <div className="canvas-overlays">
               <div className="canvas-badge">
                 <ProviderMark provider={provider.id} className="badge-mark" />
                 <span>

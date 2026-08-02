@@ -643,6 +643,18 @@ body {
   gap: 9px;
 }
 
+.canvas-overlays {
+  position: absolute;
+  z-index: 12;
+  inset: 0 0 26px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.canvas-overlays .connect-guidance {
+  pointer-events: auto;
+}
+
 .canvas-badge > span {
   display: flex;
   flex-direction: column;
@@ -670,6 +682,7 @@ body {
   overflow: hidden;
   opacity: 0.9;
   transition: opacity 160ms ease;
+  pointer-events: auto;
 }
 
 .minimap:hover {

@@ -57,9 +57,10 @@ test("applies the stored theme before first paint", async () => {
 });
 
 test("ships product code rather than starter scaffolding", async () => {
-  const [page, layout, packageJson] = await Promise.all([
+  const [page, layout, globals, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
@@ -79,7 +80,15 @@ test("ships product code rather than starter scaffolding", async () => {
   assert.match(page, /CANVAS_PAN_PADDING/);
   assert.match(page, /canvas\.scrollLeft = pan\.scrollLeft/);
   assert.match(page, /canvas\.scrollTop = pan\.scrollTop/);
+  assert.match(page, /CANVAS_WIDTH \* zoom - canvas\.clientWidth/);
+  assert.match(page, /CANVAS_HEIGHT \* zoom - canvas\.clientHeight/);
   assert.match(page, /beginCanvasPan\(event\.pointerId/);
+  assert.match(page, /className="canvas-overlays"/);
+  assert.match(
+    globals,
+    /\.canvas-stage\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/s,
+  );
+  assert.match(globals, /\.canvas-badge\s*\{[^}]*position:\s*absolute;/s);
   assert.match(page, /className="empty-canvas empty-canvas-overlay"/);
   assert.match(page, /Load real-world example architecture/);
   assert.match(page, /Load example architecture/);
