@@ -4,6 +4,8 @@
 
 ### Draw your cloud architecture. Generate deployable Terraform or Pulumi.
 
+[![InfraCanvas — draw cloud architecture and generate Terraform or Pulumi](public/og.png)](https://infracanvas-builder.karthik-m.chatgpt.site)
+
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-16-151824?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-151824?style=flat-square&logo=react)](https://react.dev/)
