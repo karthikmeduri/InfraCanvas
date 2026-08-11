@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "deployment": {
+    "manifest": { "time": "2026-08-11T00:00:00Z", "magic": "test", "version": "v3.247.0" },
+    "resources": [
+      { "urn": "urn:pulumi:prod::platform::pulumi:pulumi:Stack::platform-prod", "type": "pulumi:pulumi:Stack", "outputs": {} },
+      { "urn": "urn:pulumi:prod::platform::pulumi:providers:gcp::default", "type": "pulumi:providers:gcp", "id": "provider-id", "outputs": {} },
+      {
+        "urn": "urn:pulumi:prod::platform::gcp:compute/network:Network::production-vpc",
+        "type": "gcp:compute/network:Network",
+        "id": "projects/demo/global/networks/production-vpc",
+        "inputs": { "name": "production-vpc", "autoCreateSubnetworks": false },
+        "outputs": { "id": "projects/demo/global/networks/production-vpc", "selfLink": "https://www.googleapis.com/compute/v1/projects/demo/global/networks/production-vpc" }
+      },
+      {
+        "urn": "urn:pulumi:prod::platform::gcp:compute/subnetwork:Subnetwork::application-subnet",
+        "type": "gcp:compute/subnetwork:Subnetwork",
+        "id": "projects/demo/regions/us-west1/subnetworks/application-subnet",
+        "inputs": { "name": "application-subnet", "ipCidrRange": "10.50.10.0/24", "network": "https://www.googleapis.com/compute/v1/projects/demo/global/networks/production-vpc" },
+        "outputs": { "id": "projects/demo/regions/us-west1/subnetworks/application-subnet" },
+        "dependencies": ["urn:pulumi:prod::platform::gcp:compute/network:Network::production-vpc"]
+      },
+      {
+        "urn": "urn:pulumi:prod::platform::gcp:compute/instance:Instance::api-node",
+        "type": "gcp:compute/instance:Instance",
+        "id": "projects/demo/zones/us-west1-a/instances/api-node",
+        "inputs": { "name": "api-node", "machineType": "n2-standard-4", "networkInterfaces": [{ "subnetwork": "projects/demo/regions/us-west1/subnetworks/application-subnet" }], "apiToken": "must-not-import" },
+        "outputs": { "id": "projects/demo/zones/us-west1-a/instances/api-node" },
+        "dependencies": ["urn:pulumi:prod::platform::gcp:compute/subnetwork:Subnetwork::application-subnet"]
+      },
+      {
+        "urn": "urn:pulumi:prod::platform::gcp:sql/databaseInstance:DatabaseInstance::orders-db",
+        "type": "gcp:sql/databaseInstance:DatabaseInstance",
+        "id": "orders-db",
+        "inputs": { "name": "orders-db", "databaseVersion": "POSTGRES_16", "settings": { "tier": "db-custom-2-7680" } },
+        "outputs": { "id": "orders-db" },
+        "dependencies": ["urn:pulumi:prod::platform::gcp:compute/subnetwork:Subnetwork::application-subnet"]
+      }
+    ]
+  }
+}

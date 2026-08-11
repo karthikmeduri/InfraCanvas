@@ -9,6 +9,7 @@ export { generatePulumi } from "../../lib/pulumi/generate";
 export { validateDiagram } from "../../lib/validate";
 export { createZip } from "../../lib/zip";
 export { diagramToSvg } from "../../lib/export-diagram";
+export { parseStateFile, stateLensSupportedTypes } from "../../lib/state-lens";
 export {
   canvasTerraformResources,
   highestDriftSeverity,

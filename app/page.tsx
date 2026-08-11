@@ -20,6 +20,7 @@ import {
 } from "@/lib/catalog";
 import { defaultValues } from "@/lib/catalog/helpers";
 import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
+import { StateLensWorkspace, type LoadedState } from "@/app/components/StateLensWorkspace";
 import {
   canvasTerraformResources,
   highestDriftSeverity,
@@ -33,6 +34,7 @@ import { HighlightedCode } from "@/lib/highlight";
 import { ProviderMark, ServiceGlyph } from "@/lib/icons";
 import { generatePulumi } from "@/lib/pulumi/generate";
 import { generate } from "@/lib/terraform/generate";
+import { parseStateFile } from "@/lib/state-lens";
 import type {
   DiagramEdge,
   DiagramNode,
@@ -140,6 +142,9 @@ export default function Home() {
   const [driftOpen, setDriftOpen] = useState(false);
   const [driftReport, setDriftReport] = useState<LoadedReport | null>(null);
   const [driftImportError, setDriftImportError] = useState("");
+  const [stateLensOpen, setStateLensOpen] = useState(false);
+  const [stateLensImport, setStateLensImport] = useState<LoadedState | null>(null);
+  const [stateLensError, setStateLensError] = useState("");
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
@@ -156,6 +161,7 @@ export default function Home() {
   const decisionDialogRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const driftInputRef = useRef<HTMLInputElement>(null);
+  const stateLensInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{
     pointerId: number;
     origins: Map<string, { x: number; y: number }>;
@@ -289,6 +295,81 @@ export default function Home() {
     setDriftImportError("");
     if (driftInputRef.current) driftInputRef.current.value = "";
     notify("Drift report cleared from this tab");
+  };
+
+  const importStateFile = async (file?: File) => {
+    if (!file) return;
+    setStateLensError("");
+    if (file.size > 25 * 1024 * 1024) {
+      setStateLensImport(null);
+      setStateLensError("This file is larger than 25 MB. Export a smaller state snapshot and try again.");
+      return;
+    }
+    try {
+      const preview = parseStateFile(await file.text());
+      setStateLensImport({
+        preview,
+        fileName: file.name,
+        fileSize: file.size,
+        importedAt: new Date().toISOString(),
+      });
+      setStateLensOpen(true);
+      setCodeOpen(false);
+      setDriftOpen(false);
+      notify(`${preview.matched.length} resources mapped locally by StateLens`);
+    } catch (error) {
+      setStateLensImport(null);
+      setStateLensError(error instanceof Error ? error.message : "StateLens could not inspect this file.");
+      setStateLensOpen(true);
+    }
+  };
+
+  const clearStateImport = () => {
+    setStateLensImport(null);
+    setStateLensError("");
+    if (stateLensInputRef.current) stateLensInputRef.current.value = "";
+  };
+
+  const buildImportedArchitecture = () => {
+    if (!stateLensImport) return;
+    const { preview, fileName } = stateLensImport;
+    setProviderId(preview.providerId);
+    setProjectName(`${providerById(preview.providerId).shortName} · ${fileName.replace(/\.(tfstate|json)$/i, "")}`);
+    commit(() => ({ nodes: preview.nodes, edges: preview.edges }));
+    setSelection([]);
+    setSelectedEdgeId(null);
+    setProviderPickerOpen(false);
+    setExamplePromptOpen(false);
+    setStartupProvider(null);
+    setPendingProvider(null);
+    setStateLensOpen(false);
+    setZoom(1);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || preview.nodes.length === 0) return;
+        const minX = Math.min(...preview.nodes.map((node) => node.x));
+        const minY = Math.min(...preview.nodes.map((node) => node.y));
+        const maxX = Math.max(...preview.nodes.map((node) => node.x + NODE_WIDTH));
+        const maxY = Math.max(...preview.nodes.map((node) => node.y + NODE_HEIGHT));
+        const nextZoom = clamp(
+          Math.min(
+            (canvas.clientWidth - 96) / Math.max(1, maxX - minX),
+            (canvas.clientHeight - 120) / Math.max(1, maxY - minY),
+          ),
+          0.35,
+          1.15,
+        );
+        setZoom(nextZoom);
+        window.requestAnimationFrame(() => {
+          canvas.scrollTo({
+            left: Math.max(0, ((minX + maxX) / 2) * nextZoom - canvas.clientWidth / 2),
+            top: Math.max(0, ((minY + maxY) / 2) * nextZoom - canvas.clientHeight / 2),
+          });
+        });
+      });
+    });
+    notify(`StateLens built ${preview.nodes.length} editable resources`);
   };
 
   /* ---------------------------------------------------------------- effects */
@@ -504,6 +585,9 @@ export default function Home() {
       setStartupProvider(null);
       setCodeOpen(false);
       setDriftOpen(false);
+      setStateLensOpen(false);
+      setStateLensImport(null);
+      setStateLensError("");
       setDriftReport(null);
       setDriftImportError("");
       setSearch("");
@@ -556,6 +640,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
+    setStateLensOpen(false);
     setDriftReport(null);
     setDriftImportError("");
     setStartupProvider(null);
@@ -1339,6 +1424,7 @@ export default function Home() {
             className={`drift-nav-button ${driftOpen ? "active" : ""}`}
             onClick={() => {
               setCodeOpen(false);
+              setStateLensOpen(false);
               setDriftOpen((current) => !current);
             }}
             aria-pressed={driftOpen}
@@ -1349,10 +1435,25 @@ export default function Home() {
             {driftReport && <b>{driftReport.report.findings.length}</b>}
           </button>
           <button
+            className={`statelens-nav-button ${stateLensOpen ? "active" : ""}`}
+            onClick={() => {
+              setCodeOpen(false);
+              setDriftOpen(false);
+              setStateLensOpen((current) => !current);
+            }}
+            aria-pressed={stateLensOpen}
+            title="Turn Terraform or Pulumi state into an architecture diagram"
+          >
+            <span className="statelens-nav-icon" aria-hidden="true"><i /><i /></span>
+            StateLens
+            {stateLensImport && <b>{stateLensImport.preview.matched.length}</b>}
+          </button>
+          <button
             className="generate-button"
             onClick={() => {
               if (codeOpen) return setCodeOpen(false);
               setDriftOpen(false);
+              setStateLensOpen(false);
               setCodeOpen(true);
             }}
           >
@@ -1372,6 +1473,18 @@ export default function Home() {
         accept="application/json,.json"
         onChange={(event) => {
           void importDriftFile(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+      <input
+        ref={stateLensInputRef}
+        className="visually-hidden"
+        type="file"
+        accept="application/json,.json,.tfstate"
+        onChange={(event) => {
+          void importStateFile(event.target.files?.[0]);
           event.target.value = "";
         }}
         tabIndex={-1}
@@ -1411,7 +1524,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!codeOpen && !driftOpen && (
+      {!codeOpen && !driftOpen && !stateLensOpen && (
         <section className="workspace">
           <aside className={`library-panel ${mobileLibraryOpen ? "mobile-open" : ""}`}>
             <div className="panel-heading provider-heading">
@@ -2434,6 +2547,19 @@ export default function Home() {
             <button onClick={() => setShortcutsOpen(false)}>Close</button>
           </section>
         </div>
+      )}
+
+      {stateLensOpen && (
+        <StateLensWorkspace
+          loaded={stateLensImport}
+          error={stateLensError}
+          replacingCount={nodes.length}
+          onBack={() => setStateLensOpen(false)}
+          onChooseFile={() => stateLensInputRef.current?.click()}
+          onFile={(file) => void importStateFile(file)}
+          onClear={clearStateImport}
+          onBuild={buildImportedArchitecture}
+        />
       )}
 
       {driftOpen && (
