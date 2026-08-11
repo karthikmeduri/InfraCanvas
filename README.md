@@ -15,7 +15,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-C7F36B?style=flat-square)](LICENSE)
 
 **A visual infrastructure builder for AWS, Azure, Google Cloud, and Oracle Cloud.**
-**84 services across 4 clouds. Terraform and Pulumi output from the same connected diagram.**
+**84 services across 4 clouds. Import live state, edit the architecture, then generate Terraform or Pulumi from the same connected diagram.**
 
 ### [Launch the live InfraCanvas builder →](https://infracanvas-builder.karthik-m.chatgpt.site)
 
@@ -105,6 +105,24 @@ flowchart LR
    provider schema, not free text.
 5. **Generate.** Choose Terraform or Pulumi. One click produces either the validated
    multi-file Terraform module or a complete Pulumi TypeScript deployment project.
+
+## StateLens — state to architecture
+
+Click **StateLens** to reveal the editable architecture hidden inside existing infrastructure
+state. The guided import workspace detects the file format and cloud, previews every catalog
+match, reconstructs dependency lines, and clearly lists unsupported resources before anything
+on the canvas is replaced.
+
+Supported inputs:
+
+- raw Terraform state (`terraform.tfstate`)
+- the JSON representation produced by `terraform show -json`
+- Pulumi deployment JSON produced by `pulumi stack export --file stack.json`
+
+Parsing happens entirely in the browser. InfraCanvas does not upload or retain the state file,
+and StateLens excludes Terraform-sensitive attributes plus credential-shaped properties such as
+passwords, tokens, access keys, and private keys. The resulting non-secret configuration remains
+fully editable in the normal resource inspector.
 
 ## Verified, not just "generated"
 
@@ -353,7 +371,7 @@ resolver picks it up automatically. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Roadmap
 
-- [ ] Import existing Terraform back onto the canvas
+- [x] Import Terraform and Pulumi state back onto the canvas with StateLens
 - [ ] Nested VPC / VNet / VCN container groups
 - [ ] Cost estimates per node
 - [ ] Reusable module output instead of a flat file set
