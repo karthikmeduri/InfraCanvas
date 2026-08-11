@@ -372,6 +372,7 @@ InfraCanvas is an original idea jointly conceived by:
 | --- | --- |
 | **Karthik Meduri** | Co-author and co-creator |
 | **Sai Sravan Meduri** | Co-author and co-creator |
+| **Srikar Podicheti** | Co-author and co-creator |
 
 ## License
 
