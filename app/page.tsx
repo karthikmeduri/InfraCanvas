@@ -145,6 +145,7 @@ export default function Home() {
   const [stateLensOpen, setStateLensOpen] = useState(false);
   const [stateLensImport, setStateLensImport] = useState<LoadedState | null>(null);
   const [stateLensError, setStateLensError] = useState("");
+  const [welcomeFeature, setWelcomeFeature] = useState<"statelens" | "drift" | null>(null);
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
@@ -272,6 +273,37 @@ export default function Home() {
 
   const notify = (message: string) => setToast(message);
 
+  const showBuilder = () => {
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    if (welcomeFeature) setProviderPickerOpen(true);
+    setWelcomeFeature(null);
+  };
+
+  const showDrift = (fromWelcome = false) => {
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setStateLensOpen(false);
+    setDriftOpen(true);
+    if (fromWelcome) setWelcomeFeature("drift");
+  };
+
+  const showStateLens = (fromWelcome = false) => {
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(true);
+    if (fromWelcome) setWelcomeFeature("statelens");
+  };
+
+  const showGeneratedCode = () => {
+    setProviderPickerOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setCodeOpen(true);
+  };
+
   const importDriftFile = async (file?: File) => {
     if (!file) return;
     setDriftImportError("");
@@ -343,6 +375,7 @@ export default function Home() {
     setStartupProvider(null);
     setPendingProvider(null);
     setStateLensOpen(false);
+    setWelcomeFeature(null);
     setZoom(1);
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
@@ -586,6 +619,7 @@ export default function Home() {
       setCodeOpen(false);
       setDriftOpen(false);
       setStateLensOpen(false);
+      setWelcomeFeature(null);
       setStateLensImport(null);
       setStateLensError("");
       setDriftReport(null);
@@ -638,6 +672,7 @@ export default function Home() {
     setSelection([]);
     setSelectedEdgeId(null);
     setProviderPickerOpen(false);
+    setWelcomeFeature(null);
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
@@ -818,6 +853,8 @@ export default function Home() {
     };
 
   const focusDriftNode = (nodeId: string) => {
+    setWelcomeFeature(null);
+    setProviderPickerOpen(false);
     setDriftOpen(false);
     setCodeOpen(false);
     setSelection([nodeId]);
@@ -1421,12 +1458,17 @@ export default function Home() {
             Save
           </button>
           <button
+            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen ? "active" : ""}`}
+            onClick={showBuilder}
+            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen}
+            title="Return to the architecture builder"
+          >
+            <span className="builder-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
+            Build
+          </button>
+          <button
             className={`drift-nav-button ${driftOpen ? "active" : ""}`}
-            onClick={() => {
-              setCodeOpen(false);
-              setStateLensOpen(false);
-              setDriftOpen((current) => !current);
-            }}
+            onClick={() => showDrift()}
             aria-pressed={driftOpen}
             title="Import and inspect a TFwhy drift report"
           >
@@ -1436,11 +1478,7 @@ export default function Home() {
           </button>
           <button
             className={`statelens-nav-button ${stateLensOpen ? "active" : ""}`}
-            onClick={() => {
-              setCodeOpen(false);
-              setDriftOpen(false);
-              setStateLensOpen((current) => !current);
-            }}
+            onClick={() => showStateLens()}
             aria-pressed={stateLensOpen}
             title="Turn Terraform or Pulumi state into an architecture diagram"
           >
@@ -1449,19 +1487,13 @@ export default function Home() {
             {stateLensImport && <b>{stateLensImport.preview.matched.length}</b>}
           </button>
           <button
-            className="generate-button"
-            onClick={() => {
-              if (codeOpen) return setCodeOpen(false);
-              setDriftOpen(false);
-              setStateLensOpen(false);
-              setCodeOpen(true);
-            }}
+            className={`generate-button ${codeOpen ? "active" : ""}`}
+            onClick={showGeneratedCode}
+            aria-pressed={codeOpen}
           >
-            <span className="code-glyph" aria-hidden="true">
-              {codeOpen ? "←" : "</>"}
-            </span>
-            {codeOpen ? "Back to design" : "Generate IaC"}
-            {!codeOpen && <span className="key-hint">⌘↵</span>}
+            <span className="code-glyph" aria-hidden="true">{"</>"}</span>
+            Generate IaC
+            <span className="key-hint">⌘↵</span>
           </button>
         </div>
       </header>
@@ -2300,7 +2332,7 @@ export default function Home() {
                   <button className="danger-button" onClick={deleteSelection}>
                     Remove resource
                   </button>
-                  <button className="primary-small" onClick={() => setCodeOpen(true)}>
+                  <button className="primary-small" onClick={showGeneratedCode}>
                     View code
                   </button>
                 </div>
@@ -2373,6 +2405,41 @@ export default function Home() {
                 Checking this browser for a saved session…
               </div>
             )}
+            <div className="welcome-feature-divider" aria-hidden="true">
+              <span>Or start from your existing infrastructure</span>
+            </div>
+            <div className="welcome-feature-grid">
+              <button
+                className="welcome-feature-card statelens-feature-card"
+                onClick={() => showStateLens(true)}
+              >
+                <span className="welcome-feature-icon statelens-welcome-icon" aria-hidden="true">
+                  <i /><i />
+                </span>
+                <span className="welcome-feature-copy">
+                  <small>STATE → ARCHITECTURE</small>
+                  <strong>Open StateLens</strong>
+                  <p>Import Terraform or Pulumi state and reveal an editable architecture diagram.</p>
+                </span>
+                <span className="welcome-feature-action">Import state <i aria-hidden="true">→</i></span>
+                <span className="welcome-feature-glow" aria-hidden="true" />
+              </button>
+              <button
+                className="welcome-feature-card drift-feature-card"
+                onClick={() => showDrift(true)}
+              >
+                <span className="welcome-feature-icon drift-welcome-icon" aria-hidden="true">
+                  <i /><i /><i />
+                </span>
+                <span className="welcome-feature-copy">
+                  <small>LIVE DRIFT INTELLIGENCE</small>
+                  <strong>Inspect with TFwhy</strong>
+                  <p>Import a TFwhy report, review configuration drift, and locate affected resources.</p>
+                </span>
+                <span className="welcome-feature-action">Open drift <i aria-hidden="true">→</i></span>
+                <span className="welcome-feature-glow" aria-hidden="true" />
+              </button>
+            </div>
             <div className="provider-modal-footer">
               <span>
                 <i /> Real provider resources
@@ -2554,7 +2621,7 @@ export default function Home() {
           loaded={stateLensImport}
           error={stateLensError}
           replacingCount={nodes.length}
-          onBack={() => setStateLensOpen(false)}
+          onBack={showBuilder}
           onChooseFile={() => stateLensInputRef.current?.click()}
           onFile={(file) => void importStateFile(file)}
           onClear={clearStateImport}
@@ -2567,7 +2634,7 @@ export default function Home() {
           loaded={driftReport}
           matches={driftMatches}
           error={driftImportError}
-          onBack={() => setDriftOpen(false)}
+          onBack={showBuilder}
           onImport={() => driftInputRef.current?.click()}
           onClear={clearDriftReport}
           onFocusNode={focusDriftNode}
@@ -2582,7 +2649,7 @@ export default function Home() {
               <div>
                 <button
                   className="back-design-button"
-                  onClick={() => setCodeOpen(false)}
+                  onClick={showBuilder}
                   aria-label="Return to the architecture canvas"
                 >
                   <span aria-hidden="true">←</span>
