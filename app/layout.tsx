@@ -4,12 +4,13 @@ import "./globals.css";
 import "./builder.css";
 
 export const metadata: Metadata = {
-  title: "InfraCanvas — Visual Cloud Architecture to Terraform",
+  title: "InfraCanvas — Visual Cloud Architecture to Terraform and Pulumi",
   description:
-    "Design AWS, Azure, Google Cloud, and Oracle Cloud architectures visually, configure real infrastructure values, and generate editable Terraform templates.",
+    "Design AWS, Azure, Google Cloud, and Oracle Cloud architectures visually, then generate deployable Terraform modules or Pulumi TypeScript projects.",
   applicationName: "InfraCanvas",
   keywords: [
     "Terraform",
+    "Pulumi",
     "cloud architecture",
     "AWS",
     "Azure",

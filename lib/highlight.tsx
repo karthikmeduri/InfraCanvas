@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import type { GeneratedFile } from "./types";
 
 /**
  * Tiny HCL tokenizer for the code viewer.
@@ -27,7 +28,26 @@ const RULES: { className: string; pattern: RegExp }[] = [
   { className: "tok-punct", pattern: /^[{}[\](),.]/ },
 ];
 
-function tokenizeLine(line: string, keyPrefix: string): ReactNode[] {
+const TYPESCRIPT_RULES: { className: string; pattern: RegExp }[] = [
+  { className: "tok-comment", pattern: /^\/\/.*/ },
+  { className: "tok-comment", pattern: /^\/\*[\s\S]*?\*\// },
+  { className: "tok-string", pattern: /^(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/ },
+  {
+    className: "tok-keyword",
+    pattern: /^\b(?:import|from|export|const|let|function|return|if|else|new|async|await|throw|type|interface|extends|process)\b/,
+  },
+  { className: "tok-type", pattern: /^\b(?:string|number|boolean|unknown|Record|Promise)\b/ },
+  { className: "tok-literal", pattern: /^\b(?:true|false|null|undefined)\b/ },
+  { className: "tok-number", pattern: /^\b\d+(?:\.\d+)?\b/ },
+  { className: "tok-operator", pattern: /^(?:=>|\?\?|===|!==|&&|\|\||[=<>!+\-*/%?:&|]+)/ },
+  { className: "tok-punct", pattern: /^[{}[\](),.;]/ },
+];
+
+function tokenizeLine(
+  line: string,
+  keyPrefix: string,
+  rules: { className: string; pattern: RegExp }[] = RULES,
+): ReactNode[] {
   const nodes: ReactNode[] = [];
   let rest = line;
   let plain = "";
@@ -47,7 +67,7 @@ function tokenizeLine(line: string, keyPrefix: string): ReactNode[] {
       continue;
     }
 
-    const rule = RULES.find((candidate) => candidate.pattern.test(rest));
+    const rule = rules.find((candidate) => candidate.pattern.test(rest));
     if (!rule) {
       const word = /^[A-Za-z0-9_-]+|^./.exec(rest)![0];
       plain += word;
@@ -74,7 +94,7 @@ export function HighlightedCode({
   language,
 }: {
   contents: string;
-  language: "hcl" | "markdown" | "text";
+  language: GeneratedFile["language"];
 }) {
   const lines = contents.split("\n");
 
@@ -84,8 +104,15 @@ export function HighlightedCode({
         <span className="code-line" key={`${lineIndex}-${line.slice(0, 12)}`}>
           <b aria-hidden="true">{lineIndex + 1}</b>
           <em>
-            {language === "hcl" ? tokenizeLine(line, `l${lineIndex}`) : line || " "}
-            {language === "hcl" && line.length === 0 ? " " : null}
+            {language === "hcl"
+              ? tokenizeLine(line, `l${lineIndex}`)
+              : language === "typescript" || language === "javascript"
+                ? tokenizeLine(line, `l${lineIndex}`, TYPESCRIPT_RULES)
+                : line || " "}
+            {(language === "hcl" || language === "typescript" || language === "javascript") &&
+            line.length === 0
+              ? " "
+              : null}
           </em>
         </span>
       ))}

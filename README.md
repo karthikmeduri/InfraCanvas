@@ -2,17 +2,18 @@
 
 # ◢ InfraCanvas
 
-### Draw your cloud architecture. Get Terraform that actually validates.
+### Draw your cloud architecture. Generate deployable Terraform or Pulumi.
 
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![Next.js](https://img.shields.io/badge/Next.js-16-151824?style=flat-square&logo=nextdotjs)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-151824?style=flat-square&logo=react)](https://react.dev/)
 [![Terraform](https://img.shields.io/badge/Terraform-1.9+-725CF5?style=flat-square&logo=terraform)](https://www.terraform.io/)
+[![Pulumi](https://img.shields.io/badge/Pulumi-TypeScript-8A3391?style=flat-square&logo=pulumi)](https://www.pulumi.com/)
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-FF8A00?style=flat-square&logo=cloudflare)](https://workers.cloudflare.com/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-C7F36B?style=flat-square)](LICENSE)
 
 **A visual infrastructure builder for AWS, Azure, Google Cloud, and Oracle Cloud.**
-**84 services across 4 clouds. Zero runtime dependencies. Output verified against `terraform validate`.**
+**84 services across 4 clouds. Terraform and Pulumi output from the same connected diagram.**
 
 </div>
 
@@ -86,8 +87,8 @@ flowchart LR
 4. **Configure.** Every node has real property controls — machine types, AMI families,
    database engines, storage classes, CIDR blocks, TLS policies — sourced from the actual
    provider schema, not free text.
-5. **Generate.** One click produces a complete, formatted, multi-file Terraform module.
-   Copy a file, download a file, or take the whole thing as a `.zip`.
+5. **Generate.** Choose Terraform or Pulumi. One click produces either the validated
+   multi-file Terraform module or a complete Pulumi TypeScript deployment project.
 
 ## Verified, not just "generated"
 
@@ -153,11 +154,40 @@ also accept any region-supported custom instance type.
   per-node connection list in the inspector
 - **Inspector** — typed controls with conditional fields, live Terraform address preview,
   and a deep link to the registry docs for that resource
-- **Code workspace** — real multi-file tree, HCL syntax highlighting, per-file copy and
-  download, whole-module `.zip`
+- **Code workspace** — switch between Terraform and Pulumi, inspect the full multi-file
+  project, copy or download one file, or take the complete deployment bundle as a `.zip`
 - **Exports** — the diagram as standalone SVG or 2× PNG, for your docs and PRs
 - **Dark mode** — applied before first paint, no flash
 - **Keyboard-first** — press <kbd>?</kbd> for the full map
+
+## Pulumi support
+
+The **Generate IaC** workspace now has Terraform and Pulumi output targets. Pulumi output
+is a complete TypeScript project containing:
+
+- `Pulumi.yaml`, `index.ts`, `package.json`, and `tsconfig.json`
+- encrypted Pulumi stack configuration for sensitive inputs
+- mapped outputs from every generated resource that exposes one
+- `npm run preview`, `npm run deploy`, and `npm run destroy` workflows
+- Windows `deploy.ps1` and macOS/Linux `deploy.sh` launchers
+- the complete generated infrastructure module under `terraform/`
+
+InfraCanvas uses Pulumi's official local Terraform Module provider. During bootstrap,
+Pulumi creates a strongly typed local SDK for the generated module, manages the stack and
+state, and automatically manages OpenTofu underneath. This preserves every provider
+resource and connection across AWS, Azure, GCP, and OCI without maintaining a second,
+partial resource catalog.
+
+```bash
+npm install
+npm run bootstrap
+# Set the required values printed by bootstrap with `pulumi config set`.
+npm run preview
+npm run deploy
+```
+
+Pulumi always presents its deployment preview for confirmation before changing cloud
+infrastructure. See the [official local Terraform Module documentation](https://www.pulumi.com/docs/iac/guides/building-extending/using-existing-tools/use-terraform-module/).
 
 ## TFwhy drift detection
 
@@ -190,7 +220,7 @@ the hosted web application. See [the integration and security model](docs/tfwhy-
 
 | Keys | Action |
 | --- | --- |
-| <kbd>Ctrl/⌘</kbd> + <kbd>↵</kbd> | Generate Terraform |
+| <kbd>Ctrl/⌘</kbd> + <kbd>↵</kbd> | Generate Terraform or Pulumi |
 | <kbd>Ctrl/⌘</kbd> + <kbd>Z</kbd> / <kbd>⇧Z</kbd> | Undo / redo |
 | <kbd>Ctrl/⌘</kbd> + <kbd>D</kbd> | Duplicate selection |
 | <kbd>Ctrl/⌘</kbd> + <kbd>A</kbd> | Select all |
@@ -244,6 +274,7 @@ flowchart TB
         Catalog["catalog/ — 84 service definitions with emitters"]
         Graph["terraform/graph.ts — BFS reference resolution"]
         Gen["terraform/generate.ts — multi-file module assembly"]
+        Pulumi["pulumi/generate.ts — Pulumi project and deployment assembly"]
         Hcl["hcl.ts — HCL2 emitter"]
         Valid["validate.ts — live diagram checks"]
         Zip["zip.ts · export-diagram.ts · highlight.ts"]
@@ -255,6 +286,8 @@ flowchart TB
     Graph --> Gen
     Gen --> Hcl
     Gen --> Page
+    Gen --> Pulumi
+    Pulumi --> Page
     Page --> Zip
 ```
 

@@ -31,6 +31,7 @@ import { diagramToSvg, svgToPngBlob } from "@/lib/export-diagram";
 import { safeName } from "@/lib/hcl";
 import { HighlightedCode } from "@/lib/highlight";
 import { ProviderMark, ServiceGlyph } from "@/lib/icons";
+import { generatePulumi } from "@/lib/pulumi/generate";
 import { generate } from "@/lib/terraform/generate";
 import type {
   DiagramEdge,
@@ -62,6 +63,7 @@ const STORAGE_KEY = "infracanvas.project.v2";
 type Doc = { nodes: DiagramNode[]; edges: DiagramEdge[] };
 type SavedDraft = DiagramState & { savedAt?: string };
 type Marquee = { x: number; y: number; width: number; height: number };
+type IacTarget = "terraform" | "pulumi";
 
 const emptyDoc: Doc = { nodes: [], edges: [] };
 
@@ -89,6 +91,19 @@ const downloadBlob = (blob: Blob, filename: string) => {
   // Revoke on the next tick so Safari has time to start the download.
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+const fileBadge = (language: string) =>
+  ({
+    hcl: "tf",
+    typescript: "ts",
+    javascript: "js",
+    json: "{}",
+    yaml: "yml",
+    powershell: "ps",
+    shell: "sh",
+    markdown: "md",
+    text: "txt",
+  })[language] ?? "txt";
 
 export default function Home() {
   /* ------------------------------------------------------------------ state */
@@ -121,6 +136,7 @@ export default function Home() {
   const [marquee, setMarquee] = useState<Marquee | null>(null);
 
   const [codeOpen, setCodeOpen] = useState(false);
+  const [iacTarget, setIacTarget] = useState<IacTarget>("terraform");
   const [driftOpen, setDriftOpen] = useState(false);
   const [driftReport, setDriftReport] = useState<LoadedReport | null>(null);
   const [driftImportError, setDriftImportError] = useState("");
@@ -174,6 +190,8 @@ export default function Home() {
   const selectedService = selectedNode ? serviceById(provider, selectedNode.serviceId) : undefined;
 
   const generated = generate(provider, nodes, edges, projectName);
+  const pulumiGenerated = generatePulumi(provider, generated, projectName);
+  const activeGenerated = iacTarget === "terraform" ? generated : pulumiGenerated;
   const issues = validateDiagram(provider, nodes, edges);
   const errorCount = issues.filter((issue) => issue.severity === "error").length;
   const warningCount = issues.filter((issue) => issue.severity === "warning").length;
@@ -187,7 +205,7 @@ export default function Home() {
   });
 
   const currentFile =
-    generated.files.find((file) => file.path === activeFile) ?? generated.files[0];
+    activeGenerated.files.find((file) => file.path === activeFile) ?? activeGenerated.files[0];
 
   const groupedServices = (() => {
     const query = search.trim().toLowerCase();
@@ -1033,12 +1051,19 @@ export default function Home() {
 
   const bundleName = safeName(projectName, "infrastructure").replace(/_/g, "-");
 
+  const selectIacTarget = (target: IacTarget) => {
+    setIacTarget(target);
+    const files = target === "terraform" ? generated.files : pulumiGenerated.files;
+    setActiveFile(target === "terraform" ? "main.tf" : files[0]?.path ?? "Pulumi.yaml");
+    notify(`${target === "terraform" ? "Terraform" : "Pulumi"} output selected`);
+  };
+
   const downloadZip = () => {
     const blob = createZip(
-      generated.files.map((file) => ({ path: file.path, contents: file.contents })),
+      activeGenerated.files.map((file) => ({ path: file.path, contents: file.contents })),
     );
-    downloadBlob(blob, `${bundleName}-terraform.zip`);
-    notify(`${generated.files.length} files downloaded as .zip`);
+    downloadBlob(blob, `${bundleName}-${iacTarget}.zip`);
+    notify(`${activeGenerated.files.length} ${iacTarget === "terraform" ? "Terraform" : "Pulumi"} files downloaded as .zip`);
   };
 
   const downloadCurrentFile = () => {
@@ -1334,7 +1359,7 @@ export default function Home() {
             <span className="code-glyph" aria-hidden="true">
               {codeOpen ? "←" : "</>"}
             </span>
-            {codeOpen ? "Back to design" : "Generate Terraform"}
+            {codeOpen ? "Back to design" : "Generate IaC"}
             {!codeOpen && <span className="key-hint">⌘↵</span>}
           </button>
         </div>
@@ -1382,7 +1407,7 @@ export default function Home() {
           </button>
           <span>{nodes.length} resources</span>
           <span>{edges.length} connections</span>
-          <span>{generated.resourceCount} Terraform blocks</span>
+          <span>{generated.resourceCount} IaC resource blocks</span>
         </div>
       </div>
 
@@ -2383,7 +2408,7 @@ export default function Home() {
             <h2 id="shortcuts-title">Keyboard shortcuts</h2>
             <dl>
               {[
-                ["Ctrl / ⌘ + ↵", "Generate Terraform"],
+                ["Ctrl / ⌘ + ↵", "Generate Terraform or Pulumi"],
                 ["Ctrl / ⌘ + Z", "Undo"],
                 ["Ctrl / ⌘ + Shift + Z", "Redo"],
                 ["Ctrl / ⌘ + D", "Duplicate selection"],
@@ -2439,8 +2464,28 @@ export default function Home() {
                 <span className="code-modal-icon">&lt;/&gt;</span>
                 <span>
                   <small>Step 3 · Generated infrastructure</small>
-                  <h2 id="code-title">Terraform module</h2>
+                  <h2 id="code-title">
+                    {iacTarget === "terraform" ? "Terraform module" : "Pulumi TypeScript project"}
+                  </h2>
                 </span>
+                <div className="iac-target-switcher" role="group" aria-label="Infrastructure as code output">
+                  <button
+                    className={iacTarget === "terraform" ? "active terraform" : "terraform"}
+                    onClick={() => selectIacTarget("terraform")}
+                    aria-pressed={iacTarget === "terraform"}
+                  >
+                    <span aria-hidden="true">TF</span>
+                    Terraform
+                  </button>
+                  <button
+                    className={iacTarget === "pulumi" ? "active pulumi" : "pulumi"}
+                    onClick={() => selectIacTarget("pulumi")}
+                    aria-pressed={iacTarget === "pulumi"}
+                  >
+                    <span className="pulumi-target-mark" aria-hidden="true"><i /><i /><i /></span>
+                    Pulumi
+                  </button>
+                </div>
               </div>
               <div className="code-modal-actions">
                 <button
@@ -2453,7 +2498,7 @@ export default function Home() {
                   Download file
                 </button>
                 <button className="download-button" onClick={downloadZip}>
-                  Download .zip ({generated.files.length} files)
+                  Download .zip ({activeGenerated.files.length} files)
                 </button>
               </div>
             </header>
@@ -2461,6 +2506,9 @@ export default function Home() {
             <div className="code-summary">
               <span>
                 <ProviderMark provider={provider.id} className="summary-mark" /> {provider.name}
+              </span>
+              <span className={`iac-summary-pill ${iacTarget}`}>
+                {iacTarget === "terraform" ? "Terraform native" : "Pulumi managed"}
               </span>
               <span>{generated.resourceCount} resources</span>
               <span>{edges.length} wired references</span>
@@ -2472,14 +2520,14 @@ export default function Home() {
 
             <div className="code-workspace">
               <nav className="file-tree" aria-label="Generated files">
-                <strong>TERRAFORM MODULE</strong>
-                {generated.files.map((file) => (
+                <strong>{iacTarget === "terraform" ? "TERRAFORM MODULE" : "PULUMI PROJECT"}</strong>
+                {activeGenerated.files.map((file) => (
                   <button
                     key={file.path}
                     className={file.path === currentFile?.path ? "active" : ""}
                     onClick={() => setActiveFile(file.path)}
                   >
-                    <span>{file.language === "hcl" ? "tf" : file.language === "markdown" ? "md" : "txt"}</span>
+                    <span>{fileBadge(file.language)}</span>
                     {file.path}
                   </button>
                 ))}
@@ -2517,7 +2565,7 @@ export default function Home() {
 
               <div className="code-editor">
                 <div className="editor-tab">
-                  <span>{currentFile?.language === "hcl" ? "tf" : "txt"}</span>
+                  <span>{currentFile ? fileBadge(currentFile.language) : "txt"}</span>
                   {currentFile?.path}
                 </div>
                 <pre>
@@ -2533,11 +2581,16 @@ export default function Home() {
 
             <footer className="code-modal-footer">
               <p>
-                <span>i</span> Secrets are declared as <code>sensitive</code> variables — supply them
-                from a secret manager. Run <code>terraform init && terraform validate</code>, review{" "}
-                <code>terraform plan</code>, then apply.
+                <span>i</span>{" "}
+                {iacTarget === "terraform" ? (
+                  <>Secrets are declared as <code>sensitive</code> variables. Run <code>terraform init</code>, validate, and review <code>terraform plan</code> before applying.</>
+                ) : (
+                  <>Pulumi manages the stack and state. Run <code>npm run bootstrap</code>, set required secrets with <code>pulumi config set --secret</code>, then review <code>npm run preview</code>.</>
+                )}
               </p>
-              <button onClick={downloadZip}>Download module</button>
+              <button onClick={downloadZip}>
+                Download {iacTarget === "terraform" ? "module" : "Pulumi project"}
+              </button>
             </footer>
           </section>
         </section>
