@@ -19,10 +19,19 @@ import {
   serviceById,
 } from "@/lib/catalog";
 import { defaultValues } from "@/lib/catalog/helpers";
+import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
+import {
+  canvasTerraformResources,
+  highestDriftSeverity,
+  matchDriftFindings,
+  parseTfwhyReport,
+  type TfwhyFinding,
+} from "@/lib/drift";
 import { diagramToSvg, svgToPngBlob } from "@/lib/export-diagram";
 import { safeName } from "@/lib/hcl";
 import { HighlightedCode } from "@/lib/highlight";
 import { ProviderMark, ServiceGlyph } from "@/lib/icons";
+import { generatePulumi } from "@/lib/pulumi/generate";
 import { generate } from "@/lib/terraform/generate";
 import type {
   DiagramEdge,
@@ -54,6 +63,7 @@ const STORAGE_KEY = "infracanvas.project.v2";
 type Doc = { nodes: DiagramNode[]; edges: DiagramEdge[] };
 type SavedDraft = DiagramState & { savedAt?: string };
 type Marquee = { x: number; y: number; width: number; height: number };
+type IacTarget = "terraform" | "pulumi";
 
 const emptyDoc: Doc = { nodes: [], edges: [] };
 
@@ -81,6 +91,19 @@ const downloadBlob = (blob: Blob, filename: string) => {
   // Revoke on the next tick so Safari has time to start the download.
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+const fileBadge = (language: string) =>
+  ({
+    hcl: "tf",
+    typescript: "ts",
+    javascript: "js",
+    json: "{}",
+    yaml: "yml",
+    powershell: "ps",
+    shell: "sh",
+    markdown: "md",
+    text: "txt",
+  })[language] ?? "txt";
 
 export default function Home() {
   /* ------------------------------------------------------------------ state */
@@ -113,6 +136,10 @@ export default function Home() {
   const [marquee, setMarquee] = useState<Marquee | null>(null);
 
   const [codeOpen, setCodeOpen] = useState(false);
+  const [iacTarget, setIacTarget] = useState<IacTarget>("terraform");
+  const [driftOpen, setDriftOpen] = useState(false);
+  const [driftReport, setDriftReport] = useState<LoadedReport | null>(null);
+  const [driftImportError, setDriftImportError] = useState("");
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
@@ -128,6 +155,7 @@ export default function Home() {
   const providerDialogRef = useRef<HTMLElement>(null);
   const decisionDialogRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const driftInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{
     pointerId: number;
     origins: Map<string, { x: number; y: number }>;
@@ -162,12 +190,22 @@ export default function Home() {
   const selectedService = selectedNode ? serviceById(provider, selectedNode.serviceId) : undefined;
 
   const generated = generate(provider, nodes, edges, projectName);
+  const pulumiGenerated = generatePulumi(provider, generated, projectName);
+  const activeGenerated = iacTarget === "terraform" ? generated : pulumiGenerated;
   const issues = validateDiagram(provider, nodes, edges);
   const errorCount = issues.filter((issue) => issue.severity === "error").length;
   const warningCount = issues.filter((issue) => issue.severity === "warning").length;
+  const driftMatches = driftReport
+    ? matchDriftFindings(driftReport.report, canvasTerraformResources(provider, nodes))
+    : [];
+  const driftByNode = new Map<string, TfwhyFinding[]>();
+  driftMatches.forEach(({ finding, nodeId }) => {
+    if (!nodeId) return;
+    driftByNode.set(nodeId, [...(driftByNode.get(nodeId) ?? []), finding]);
+  });
 
   const currentFile =
-    generated.files.find((file) => file.path === activeFile) ?? generated.files[0];
+    activeGenerated.files.find((file) => file.path === activeFile) ?? activeGenerated.files[0];
 
   const groupedServices = (() => {
     const query = search.trim().toLowerCase();
@@ -227,6 +265,31 @@ export default function Home() {
   };
 
   const notify = (message: string) => setToast(message);
+
+  const importDriftFile = async (file?: File) => {
+    if (!file) return;
+    setDriftImportError("");
+    if (file.size > 5 * 1024 * 1024) {
+      setDriftImportError("The report is larger than 5 MB. Import TFwhy's JSON output, not a Terraform state file.");
+      return;
+    }
+    try {
+      const report = parseTfwhyReport(await file.text());
+      setDriftReport({ report, fileName: file.name, importedAt: new Date().toISOString() });
+      setDriftOpen(true);
+      setCodeOpen(false);
+      notify(`${report.findings.length} TFwhy drift findings imported locally`);
+    } catch (error) {
+      setDriftImportError(error instanceof Error ? error.message : "Unable to read this TFwhy report.");
+    }
+  };
+
+  const clearDriftReport = () => {
+    setDriftReport(null);
+    setDriftImportError("");
+    if (driftInputRef.current) driftInputRef.current.value = "";
+    notify("Drift report cleared from this tab");
+  };
 
   /* ---------------------------------------------------------------- effects */
   // Discover a saved draft without restoring it automatically. Every browser
@@ -440,6 +503,9 @@ export default function Home() {
       setPendingProvider(null);
       setStartupProvider(null);
       setCodeOpen(false);
+      setDriftOpen(false);
+      setDriftReport(null);
+      setDriftImportError("");
       setSearch("");
       if (withSample) {
         loadSample(nextId);
@@ -489,6 +555,9 @@ export default function Home() {
     setSelectedEdgeId(null);
     setProviderPickerOpen(false);
     setCodeOpen(false);
+    setDriftOpen(false);
+    setDriftReport(null);
+    setDriftImportError("");
     setStartupProvider(null);
     setExamplePromptOpen(false);
     notify(`Resumed ${savedDraft.projectName}`);
@@ -556,6 +625,8 @@ export default function Home() {
     setSelection([]);
     setSelectedEdgeId(null);
     setZoom(1);
+    setDriftReport(null);
+    setDriftImportError("");
     setExamplePromptOpen(true);
     notify("Canvas cleared");
   };
@@ -660,6 +731,16 @@ export default function Home() {
         behavior: "smooth",
       });
     };
+
+  const focusDriftNode = (nodeId: string) => {
+    setDriftOpen(false);
+    setCodeOpen(false);
+    setSelection([nodeId]);
+    setSelectedEdgeId(null);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => revealNode(nodeId));
+    });
+  };
 
   const focusValidationIssue = (issue: ValidationIssue) => {
     setIssuesOpen(true);
@@ -970,12 +1051,19 @@ export default function Home() {
 
   const bundleName = safeName(projectName, "infrastructure").replace(/_/g, "-");
 
+  const selectIacTarget = (target: IacTarget) => {
+    setIacTarget(target);
+    const files = target === "terraform" ? generated.files : pulumiGenerated.files;
+    setActiveFile(target === "terraform" ? "main.tf" : files[0]?.path ?? "Pulumi.yaml");
+    notify(`${target === "terraform" ? "Terraform" : "Pulumi"} output selected`);
+  };
+
   const downloadZip = () => {
     const blob = createZip(
-      generated.files.map((file) => ({ path: file.path, contents: file.contents })),
+      activeGenerated.files.map((file) => ({ path: file.path, contents: file.contents })),
     );
-    downloadBlob(blob, `${bundleName}-terraform.zip`);
-    notify(`${generated.files.length} files downloaded as .zip`);
+    downloadBlob(blob, `${bundleName}-${iacTarget}.zip`);
+    notify(`${activeGenerated.files.length} ${iacTarget === "terraform" ? "Terraform" : "Pulumi"} files downloaded as .zip`);
   };
 
   const downloadCurrentFile = () => {
@@ -1247,15 +1335,48 @@ export default function Home() {
           <button className="ghost-button" onClick={saveProject}>
             Save
           </button>
-          <button className="generate-button" onClick={() => setCodeOpen((current) => !current)}>
+          <button
+            className={`drift-nav-button ${driftOpen ? "active" : ""}`}
+            onClick={() => {
+              setCodeOpen(false);
+              setDriftOpen((current) => !current);
+            }}
+            aria-pressed={driftOpen}
+            title="Import and inspect a TFwhy drift report"
+          >
+            <span className="drift-nav-icon" aria-hidden="true"><i /><i /><i /></span>
+            Drift
+            {driftReport && <b>{driftReport.report.findings.length}</b>}
+          </button>
+          <button
+            className="generate-button"
+            onClick={() => {
+              if (codeOpen) return setCodeOpen(false);
+              setDriftOpen(false);
+              setCodeOpen(true);
+            }}
+          >
             <span className="code-glyph" aria-hidden="true">
               {codeOpen ? "←" : "</>"}
             </span>
-            {codeOpen ? "Back to design" : "Generate Terraform"}
+            {codeOpen ? "Back to design" : "Generate IaC"}
             {!codeOpen && <span className="key-hint">⌘↵</span>}
           </button>
         </div>
       </header>
+
+      <input
+        ref={driftInputRef}
+        className="visually-hidden"
+        type="file"
+        accept="application/json,.json"
+        onChange={(event) => {
+          void importDriftFile(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
 
       <div className="workflow-bar">
         <ol className="workflow-steps" aria-label="Builder workflow">
@@ -1286,11 +1407,11 @@ export default function Home() {
           </button>
           <span>{nodes.length} resources</span>
           <span>{edges.length} connections</span>
-          <span>{generated.resourceCount} Terraform blocks</span>
+          <span>{generated.resourceCount} IaC resource blocks</span>
         </div>
       </div>
 
-      {!codeOpen && (
+      {!codeOpen && !driftOpen && (
         <section className="workspace">
           <aside className={`library-panel ${mobileLibraryOpen ? "mobile-open" : ""}`}>
             <div className="panel-heading provider-heading">
@@ -1631,6 +1752,8 @@ export default function Home() {
                     const selected = selection.includes(node.id);
                     const nodeIssues = issues.filter((issue) => issue.nodeId === node.id);
                     const focusedIssue = nodeIssues.find((issue) => issue.id === activeIssueId);
+                    const nodeDrift = driftByNode.get(node.id) ?? [];
+                    const driftSeverity = highestDriftSeverity(nodeDrift);
                     const worst = nodeIssues.some((issue) => issue.severity === "error")
                       ? "error"
                       : nodeIssues.length > 0
@@ -1639,7 +1762,7 @@ export default function Home() {
                     return (
                       <div
                         key={node.id}
-                        className={`diagram-node ${selected ? "selected" : ""} ${focusedIssue ? `validation-focus validation-${focusedIssue.severity}` : ""} ${connectionStart === node.id ? "connection-start" : ""} status-${worst}`}
+                        className={`diagram-node ${selected ? "selected" : ""} ${focusedIssue ? `validation-focus validation-${focusedIssue.severity}` : ""} ${connectionStart === node.id ? "connection-start" : ""} ${driftSeverity ? `has-drift drift-${driftSeverity.toLowerCase()}` : ""} status-${worst}`}
                         style={
                           {
                             left: node.x,
@@ -1701,6 +1824,14 @@ export default function Home() {
                               : nodeIssues.map((issue) => issue.title).join(" · ")
                           }
                         />
+                        {driftSeverity && (
+                          <span
+                            className="node-drift-badge"
+                            title={`${nodeDrift.length} TFwhy drift ${nodeDrift.length === 1 ? "finding" : "findings"}`}
+                          >
+                            {nodeDrift.length}
+                          </span>
+                        )}
                         <span
                           className="node-port output-port"
                           role="button"
@@ -2277,7 +2408,7 @@ export default function Home() {
             <h2 id="shortcuts-title">Keyboard shortcuts</h2>
             <dl>
               {[
-                ["Ctrl / ⌘ + ↵", "Generate Terraform"],
+                ["Ctrl / ⌘ + ↵", "Generate Terraform or Pulumi"],
                 ["Ctrl / ⌘ + Z", "Undo"],
                 ["Ctrl / ⌘ + Shift + Z", "Redo"],
                 ["Ctrl / ⌘ + D", "Duplicate selection"],
@@ -2305,6 +2436,19 @@ export default function Home() {
         </div>
       )}
 
+      {driftOpen && (
+        <DriftWorkspace
+          loaded={driftReport}
+          matches={driftMatches}
+          error={driftImportError}
+          onBack={() => setDriftOpen(false)}
+          onImport={() => driftInputRef.current?.click()}
+          onClear={clearDriftReport}
+          onFocusNode={focusDriftNode}
+          onCopy={copyText}
+        />
+      )}
+
       {codeOpen && (
         <section className="terraform-page" aria-labelledby="code-title">
           <section className="code-modal">
@@ -2320,8 +2464,28 @@ export default function Home() {
                 <span className="code-modal-icon">&lt;/&gt;</span>
                 <span>
                   <small>Step 3 · Generated infrastructure</small>
-                  <h2 id="code-title">Terraform module</h2>
+                  <h2 id="code-title">
+                    {iacTarget === "terraform" ? "Terraform module" : "Pulumi TypeScript project"}
+                  </h2>
                 </span>
+                <div className="iac-target-switcher" role="group" aria-label="Infrastructure as code output">
+                  <button
+                    className={iacTarget === "terraform" ? "active terraform" : "terraform"}
+                    onClick={() => selectIacTarget("terraform")}
+                    aria-pressed={iacTarget === "terraform"}
+                  >
+                    <span aria-hidden="true">TF</span>
+                    Terraform
+                  </button>
+                  <button
+                    className={iacTarget === "pulumi" ? "active pulumi" : "pulumi"}
+                    onClick={() => selectIacTarget("pulumi")}
+                    aria-pressed={iacTarget === "pulumi"}
+                  >
+                    <span className="pulumi-target-mark" aria-hidden="true"><i /><i /><i /></span>
+                    Pulumi
+                  </button>
+                </div>
               </div>
               <div className="code-modal-actions">
                 <button
@@ -2334,7 +2498,7 @@ export default function Home() {
                   Download file
                 </button>
                 <button className="download-button" onClick={downloadZip}>
-                  Download .zip ({generated.files.length} files)
+                  Download .zip ({activeGenerated.files.length} files)
                 </button>
               </div>
             </header>
@@ -2342,6 +2506,9 @@ export default function Home() {
             <div className="code-summary">
               <span>
                 <ProviderMark provider={provider.id} className="summary-mark" /> {provider.name}
+              </span>
+              <span className={`iac-summary-pill ${iacTarget}`}>
+                {iacTarget === "terraform" ? "Terraform native" : "Pulumi managed"}
               </span>
               <span>{generated.resourceCount} resources</span>
               <span>{edges.length} wired references</span>
@@ -2353,14 +2520,14 @@ export default function Home() {
 
             <div className="code-workspace">
               <nav className="file-tree" aria-label="Generated files">
-                <strong>TERRAFORM MODULE</strong>
-                {generated.files.map((file) => (
+                <strong>{iacTarget === "terraform" ? "TERRAFORM MODULE" : "PULUMI PROJECT"}</strong>
+                {activeGenerated.files.map((file) => (
                   <button
                     key={file.path}
                     className={file.path === currentFile?.path ? "active" : ""}
                     onClick={() => setActiveFile(file.path)}
                   >
-                    <span>{file.language === "hcl" ? "tf" : file.language === "markdown" ? "md" : "txt"}</span>
+                    <span>{fileBadge(file.language)}</span>
                     {file.path}
                   </button>
                 ))}
@@ -2398,7 +2565,7 @@ export default function Home() {
 
               <div className="code-editor">
                 <div className="editor-tab">
-                  <span>{currentFile?.language === "hcl" ? "tf" : "txt"}</span>
+                  <span>{currentFile ? fileBadge(currentFile.language) : "txt"}</span>
                   {currentFile?.path}
                 </div>
                 <pre>
@@ -2414,11 +2581,16 @@ export default function Home() {
 
             <footer className="code-modal-footer">
               <p>
-                <span>i</span> Secrets are declared as <code>sensitive</code> variables — supply them
-                from a secret manager. Run <code>terraform init && terraform validate</code>, review{" "}
-                <code>terraform plan</code>, then apply.
+                <span>i</span>{" "}
+                {iacTarget === "terraform" ? (
+                  <>Secrets are declared as <code>sensitive</code> variables. Run <code>terraform init</code>, validate, and review <code>terraform plan</code> before applying.</>
+                ) : (
+                  <>Pulumi manages the stack and state. Run <code>npm run bootstrap</code>, set required secrets with <code>pulumi config set --secret</code>, then review <code>npm run preview</code>.</>
+                )}
               </p>
-              <button onClick={downloadZip}>Download module</button>
+              <button onClick={downloadZip}>
+                Download {iacTarget === "terraform" ? "module" : "Pulumi project"}
+              </button>
             </footer>
           </section>
         </section>

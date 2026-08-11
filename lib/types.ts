@@ -166,7 +166,16 @@ export type DiagramState = {
 
 export type GeneratedFile = {
   path: string;
-  language: "hcl" | "markdown" | "text";
+  language:
+    | "hcl"
+    | "typescript"
+    | "javascript"
+    | "json"
+    | "yaml"
+    | "powershell"
+    | "shell"
+    | "markdown"
+    | "text";
   contents: string;
 };
 

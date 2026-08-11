@@ -33,14 +33,14 @@ test("server-renders the InfraCanvas builder", async () => {
   const html = (await response.text()).replaceAll("<!-- -->", "");
   assert.match(
     html,
-    /<title>InfraCanvas — Visual Cloud Architecture to Terraform<\/title>/i,
+    /<title>InfraCanvas — Visual Cloud Architecture to Terraform and Pulumi<\/title>/i,
   );
   assert.match(html, /Where are you building\?/);
   assert.match(html, /Amazon Web Services/);
   assert.match(html, /Microsoft Azure/);
   assert.match(html, /Google Cloud/);
   assert.match(html, /Oracle Cloud Infrastructure/);
-  assert.match(html, /Generate Terraform/);
+  assert.match(html, /Generate IaC/);
 
   // Provider cards advertise the real catalog size and Terraform provider.
   assert.match(html, /hashicorp\/aws/);

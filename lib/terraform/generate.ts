@@ -207,6 +207,10 @@ export type GenerationResult = {
   /** Resources that fell back to an input variable because an edge was missing. */
   unresolved: { nodeId: string; label: string; variable: string }[];
   resourceCount: number;
+  /** Input contract reused by Pulumi's generated local-module SDK. */
+  variables: VariableSpec[];
+  /** Output contract exposed by both Terraform and Pulumi bundles. */
+  outputs: OutputSpec[];
 };
 
 export function generate(
@@ -412,6 +416,8 @@ export function generate(
     ],
     unresolved,
     resourceCount,
+    variables: [...variables.values()],
+    outputs,
   };
 }
 
