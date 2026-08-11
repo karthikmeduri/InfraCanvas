@@ -17,6 +17,18 @@
 
 </div>
 
+## See InfraCanvas in action
+
+![InfraCanvas secure AWS production architecture](docs/images/infracanvas-aws-architecture.png)
+
+| Choose your cloud provider | Generate complete Terraform |
+| --- | --- |
+| ![InfraCanvas cloud provider selection](docs/images/infracanvas-provider-selection.png) | ![InfraCanvas generated Terraform module](docs/images/infracanvas-terraform-output.png) |
+
+### Generate Pulumi from the same architecture
+
+![InfraCanvas generated Pulumi TypeScript project](docs/images/infracanvas-pulumi-output.png)
+
 ---
 
 ## The one thing most diagram-to-IaC tools get wrong
