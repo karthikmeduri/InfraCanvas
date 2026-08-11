@@ -15,7 +15,21 @@
 **A visual infrastructure builder for AWS, Azure, Google Cloud, and Oracle Cloud.**
 **84 services across 4 clouds. Terraform and Pulumi output from the same connected diagram.**
 
+### [Launch the live InfraCanvas builder →](https://infracanvas-builder.karthik-m.chatgpt.site)
+
 </div>
+
+## See InfraCanvas in action
+
+![InfraCanvas secure AWS production architecture](docs/images/infracanvas-aws-architecture.png)
+
+| Choose your cloud provider | Generate complete Terraform |
+| --- | --- |
+| ![InfraCanvas cloud provider selection](docs/images/infracanvas-provider-selection.png) | ![InfraCanvas generated Terraform module](docs/images/infracanvas-terraform-output.png) |
+
+### Generate Pulumi from the same architecture
+
+![InfraCanvas generated Pulumi TypeScript project](docs/images/infracanvas-pulumi-output.png)
 
 ---
 
@@ -358,6 +372,7 @@ InfraCanvas is an original idea jointly conceived by:
 | --- | --- |
 | **Karthik Meduri** | Co-author and co-creator |
 | **Sai Sravan Meduri** | Co-author and co-creator |
+| **Srikar Podicheti** | Co-author and co-creator |
 
 ## License
 
