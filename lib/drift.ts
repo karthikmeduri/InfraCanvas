@@ -103,7 +103,7 @@ export function normalizeTerraformAddress(address: string) {
 export function canvasTerraformResources(provider: ProviderDefinition, nodes: DiagramNode[]) {
   return nodes.flatMap((node) => {
     const service = provider.services.find((item) => item.id === node.serviceId);
-    if (!service) return [];
+    if (!service || service.iacSupport === "diagram") return [];
     return [{
       id: node.id,
       type: service.tfType,

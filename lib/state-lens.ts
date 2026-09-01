@@ -182,7 +182,9 @@ const providerFromPulumi = (type: string): ProviderId | null =>
 
 const terraformServiceId = (providerId: ProviderId | null, type: string) => {
   if (!providerId) return null;
-  return providerById(providerId).services.find((service) => service.tfType === type)?.id ?? null;
+  return providerById(providerId).services.find(
+    (service) => service.iacSupport !== "diagram" && service.tfType === type,
+  )?.id ?? null;
 };
 
 const pulumiServiceId = (providerId: ProviderId | null, type: string) => {
@@ -501,4 +503,8 @@ export const parseStateFile = (contents: string): StateLensPreview => {
 };
 
 export const stateLensSupportedTypes = () =>
-  providers.flatMap((provider) => provider.services.map((service) => ({ providerId: provider.id, tfType: service.tfType, serviceId: service.id })));
+  providers.flatMap((provider) =>
+    provider.services
+      .filter((service) => service.iacSupport !== "diagram")
+      .map((service) => ({ providerId: provider.id, tfType: service.tfType, serviceId: service.id })),
+  );

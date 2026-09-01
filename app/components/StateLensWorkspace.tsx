@@ -3,7 +3,7 @@
 import { useState, type CSSProperties, type DragEvent } from "react";
 
 import { providerById } from "@/lib/catalog";
-import { ProviderMark, ServiceGlyph } from "@/lib/icons";
+import { ProviderMark, ServiceArtwork } from "@/lib/icons";
 import type { StateLensPreview } from "@/lib/state-lens";
 
 export type LoadedState = {
@@ -148,7 +148,7 @@ export function StateLensWorkspace({
                 if (!service) return null;
                 return (
                   <article key={resource.address} style={{ "--service-accent": service.accent } as CSSProperties}>
-                    <span className="mapped-service-icon"><ServiceGlyph role={service.role} className="service-glyph" /></span>
+                    <span className="mapped-service-icon"><ServiceArtwork service={service} className="service-glyph" /></span>
                     <span><strong>{resource.name}</strong><small>{service.name}</small><code>{resource.type}</code></span>
                     <b>{String(index + 1).padStart(2, "0")}</b>
                   </article>

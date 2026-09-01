@@ -25,7 +25,7 @@ import type {
 import type { HclEntry } from "../hcl";
 import { buildGraph } from "./graph";
 
-const resolveAttribute = (target: RefTarget, attribute: RefAttribute): string =>
+const resolveAttribute = (target: RefTarget, attribute: RefAttribute): string | undefined =>
   typeof attribute === "function"
     ? attribute(target)
     : `${target.tfType}.${target.name}.${attribute}`;
@@ -207,6 +207,8 @@ export type GenerationResult = {
   /** Resources that fell back to an input variable because an edge was missing. */
   unresolved: { nodeId: string; label: string; variable: string }[];
   resourceCount: number;
+  /** Official architecture services intentionally excluded from deployable code. */
+  diagramOnly: { nodeId: string; name: string; service: string }[];
   /** Input contract reused by Pulumi's generated local-module SDK. */
   variables: VariableSpec[];
   /** Output contract exposed by both Terraform and Pulumi bundles. */
@@ -220,6 +222,13 @@ export function generate(
   projectName: string,
 ): GenerationResult {
   const graph = buildGraph(provider, nodes, edges);
+  const diagramOnly: GenerationResult["diagramOnly"] = graph.ordered
+    .filter((item) => item.service.iacSupport === "diagram")
+    .map((item) => ({
+      nodeId: item.node.id,
+      name: item.node.values.name || item.service.name,
+      service: item.service.name,
+    }));
 
   const variables = new Map<string, VariableSpec>();
   baseVariables(provider, projectName).forEach((spec) => variables.set(spec.name, spec));
@@ -240,10 +249,13 @@ export function generate(
     const rolesOf = (roles: ServiceRole | ServiceRole[]) =>
       Array.isArray(roles) ? roles : [roles];
 
-    const reachableMatches = (roles: ServiceRole | ServiceRole[]) =>
+    const deployableMatches = (roles: ServiceRole | ServiceRole[]) =>
       graph
         .findByRole(item.node.id, rolesOf(roles))
-        .filter((match) => Number.isFinite(match.distance));
+        .filter((match) => match.item.service.iacSupport !== "diagram");
+
+    const reachableMatches = (roles: ServiceRole | ServiceRole[]) =>
+      deployableMatches(roles).filter((match) => Number.isFinite(match.distance));
 
     const noteFallback = (spec: VariableSpec) => {
       unresolved.push({
@@ -259,35 +271,39 @@ export function generate(
       display: item.node.values.name || item.service.name,
       v: item.node.values,
       tags: raw("local.tags"),
-      connected: (graph.neighbours.get(item.node.id) ?? []).length > 0,
-      has: (roles) =>
-        graph.findByRole(item.node.id, rolesOf(roles)).some((match) => match.distance === 1),
+      connected: (graph.neighbours.get(item.node.id) ?? []).some((nodeId) => {
+        const neighbour = graph.byId.get(nodeId);
+        return neighbour !== undefined && neighbour.service.iacSupport !== "diagram";
+      }),
+      has: (roles) => deployableMatches(roles).some((match) => match.distance === 1),
       variable: declareVariable,
       output: (spec) => outputs.push(spec),
       data: (key, entry) => {
         if (!dataSources.has(key)) dataSources.set(key, entry);
       },
       ref: (roles, attribute, fallback) => {
-        const all = graph.findByRole(item.node.id, rolesOf(roles));
-        const reachable = all.filter((match) => Number.isFinite(match.distance));
+        const all = deployableMatches(roles)
+          .map((match) => ({ match, expression: resolveAttribute(match.item.target, attribute) }))
+          .filter((candidate) => candidate.expression !== undefined);
+        const reachable = all.filter((candidate) => Number.isFinite(candidate.match.distance));
         // Prefer a connected resource; otherwise accept a lone unconnected one
         // of the right role, which is almost always what the author meant.
         const chosen = reachable[0] ?? (all.length === 1 ? all[0] : undefined);
-        if (chosen) return raw(resolveAttribute(chosen.item.target, attribute));
+        if (chosen?.expression) return raw(chosen.expression);
         noteFallback(fallback);
         return declareVariable(fallback);
       },
       refList: (roles, attribute, fallback) => {
-        const reachable = reachableMatches(roles);
+        const reachable = reachableMatches(roles)
+          .map((match) => ({ match, expression: resolveAttribute(match.item.target, attribute) }))
+          .filter((candidate) => candidate.expression !== undefined);
         if (reachable.length > 0) {
           // A diagram can contain many resources of the same role. Only use
           // the closest connected tier so an ALB wired to public subnets does
           // not also absorb private/data subnets through the VPC graph.
-          const nearestDistance = reachable[0].distance;
-          const nearest = reachable.filter((match) => match.distance === nearestDistance);
-          return listOf(
-            nearest.map((match) => raw(resolveAttribute(match.item.target, attribute))),
-          );
+          const nearestDistance = reachable[0].match.distance;
+          const nearest = reachable.filter((candidate) => candidate.match.distance === nearestDistance);
+          return listOf(nearest.map((candidate) => raw(candidate.expression!)));
         }
         noteFallback(fallback);
         return declareVariable(fallback);
@@ -358,9 +374,16 @@ export function generate(
     });
   }
   mainEntries.push(...resourceEntries);
+  if (diagramOnly.length > 0) {
+    mainEntries.push(
+      { kind: "blank" },
+      comment("Diagram-only services (not emitted as unverified provider resources)"),
+      ...diagramOnly.map((item) => comment(`${item.service} — ${item.name}`)),
+    );
+  }
 
   const mainFile = render(
-    resourceEntries.length > 0
+    resourceEntries.length > 0 || diagramOnly.length > 0
       ? mainEntries
       : [comment("Drop resources onto the InfraCanvas grid to generate infrastructure.")],
   );
@@ -416,6 +439,7 @@ export function generate(
     ],
     unresolved,
     resourceCount,
+    diagramOnly,
     variables: [...variables.values()],
     outputs,
   };
@@ -446,7 +470,7 @@ function bundleReadme(
   const rows = graph.ordered
     .map(
       (item) =>
-        `| \`${item.address}\` | ${item.service.name} | ${item.service.category} |`,
+        `| ${item.service.iacSupport === "diagram" ? "_Diagram only_" : `\`${item.address}\``} | ${item.service.name} | ${item.service.category} | ${item.service.iacSupport === "diagram" ? "Architecture" : "IaC ready"} |`,
     )
     .join("\n");
 
@@ -472,9 +496,11 @@ ${mermaidEdges}
 
 ## Resources
 
-| Address | Service | Category |
-| --- | --- | --- |
-${rows || "| _none_ | | |"}
+| Address | Service | Category | Generation |
+| --- | --- | --- | --- |
+${rows || "| _none_ | | | |"}
+
+${graph.ordered.some((item) => item.service.iacSupport === "diagram") ? "> **Generation boundary:** Diagram-only services use official provider artwork and remain in the architecture export, but are intentionally omitted from Terraform and Pulumi until their required provider configuration is modeled.\n" : ""}
 
 ## Usage
 

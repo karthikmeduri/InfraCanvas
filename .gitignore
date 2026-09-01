@@ -30,6 +30,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -52,3 +53,6 @@ next-env.d.ts
 
 # editor and agent tooling
 /.claude/
+# Local vendor source packs are large and may include license PDFs and size variants.
+# The optimized SVG subset used by the app lives in public/cloud-icons.
+icons packs/

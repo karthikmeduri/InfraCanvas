@@ -77,7 +77,7 @@ export type RefTarget = {
  * expression, for cases where the referenced address differs from the matched
  * resource's primary type (an ALB's target group, for example).
  */
-export type RefAttribute = string | ((target: RefTarget) => string);
+export type RefAttribute = string | ((target: RefTarget) => string | undefined);
 
 export type EmitContext = {
   provider: ProviderId;
@@ -126,6 +126,12 @@ export type ServiceDefinition = {
   role: ServiceRole;
   description: string;
   accent: string;
+  /** Official provider artwork served locally with the application. */
+  icon?: string;
+  /** Deployable services emit verified IaC; diagram services are visual-only. */
+  iacSupport?: "deployable" | "diagram";
+  /** Original vendor category used for browsing and filtering. */
+  productFamily?: string;
   /** Primary Terraform resource type — used for cross-resource references. */
   tfType: string;
   /** Docs deep link shown in the inspector. */

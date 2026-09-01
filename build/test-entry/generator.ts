@@ -11,6 +11,12 @@ export { createZip } from "../../lib/zip";
 export { diagramToSvg } from "../../lib/export-diagram";
 export { parseStateFile, stateLensSupportedTypes } from "../../lib/state-lens";
 export {
+  createLocalArchitectureDraft,
+  normalizeArchitecturePlan,
+  planNodeDefaults,
+} from "../../lib/ai-architect";
+export { removeDiagramEdge } from "../../lib/diagram";
+export {
   canvasTerraformResources,
   highestDriftSeverity,
   matchDriftFindings,

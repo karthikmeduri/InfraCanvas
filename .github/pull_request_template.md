@@ -2,6 +2,14 @@
 
 <!-- One or two sentences. -->
 
+## User impact and lifecycle direction
+
+<!-- Which part of prompt → diagram → IaC → state → drift does this improve? -->
+
+- [ ] The change is labelled honestly as available, in progress, or planned
+- [ ] New interactions are keyboard accessible and usable in light and dark themes
+- [ ] AI, state, drift, credential, or deployment changes document their security boundary
+
 ## Checklist
 
 - [ ] `npm run typecheck` is clean

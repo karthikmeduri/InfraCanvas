@@ -1,7 +1,21 @@
 # Contributing to InfraCanvas
 
-Thanks for taking the time. The most valuable contribution is usually **a new cloud
-service**, and the project is structured so that takes one file change.
+Thanks for taking the time. InfraCanvas is **The Bidirectional IaC Workspace**, so valuable
+contributions can improve any part of the loop: prompt, diagram, provider configuration,
+Terraform or Pulumi generation, state import, drift reconciliation, validation, or documentation.
+
+## Ways to contribute
+
+- Add or improve a verified cloud-service emitter and its configuration controls.
+- Improve AI architecture normalization without allowing unknown or diagram-only services into IaC.
+- Expand StateLens resource matching while continuing to exclude sensitive state attributes.
+- Improve TFwhy matching, drift explanation, or future reconciliation review.
+- Add accessibility, keyboard, responsive, export, test, documentation, or example improvements.
+- Reproduce a focused issue and propose the smallest safe fix.
+
+For a larger feature, open a feature request first and connect it to a milestone in
+[ROADMAP.md](ROADMAP.md). Describe the user problem and security boundary before the
+implementation. This keeps the product honest about what is available versus planned.
 
 ## Setup
 

@@ -1,4 +1,4 @@
-import type { ProviderId, ServiceRole } from "./types";
+import type { ProviderId, ServiceDefinition, ServiceRole } from "./types";
 
 /**
  * All artwork is inline SVG on purpose: no network requests, no CDN, crisp at
@@ -80,6 +80,32 @@ export function ServiceGlyph({ role, className }: MarkProps & { role: ServiceRol
       {GLYPHS[role]}
     </svg>
   );
+}
+
+/** Official provider artwork when available, with the existing role glyph as a fallback. */
+export function ServiceArtwork({
+  service,
+  className,
+}: {
+  service: ServiceDefinition;
+  className?: string;
+}) {
+  if (service.icon) {
+    return (
+      // SVGs are already tiny, local, immutable catalog assets; image
+      // optimization would add runtime work without reducing their payload.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={service.icon}
+        className={className}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        loading="lazy"
+      />
+    );
+  }
+  return <ServiceGlyph role={service.role} className={className} />;
 }
 
 const GLYPHS: Record<ServiceRole, React.ReactNode> = {

@@ -62,6 +62,17 @@ export function validateDiagram(
     const label = item.node.values.name || item.service.name;
     const neighbours = graph.neighbours.get(item.node.id) ?? [];
 
+    if (item.service.iacSupport === "diagram") {
+      issues.push({
+        id: `diagram-only-${item.node.id}`,
+        severity: "warning",
+        title: `${label} is diagram-only`,
+        detail: `${item.service.name} uses official provider artwork and remains in diagram exports, but InfraCanvas does not emit unverified Terraform or Pulumi for it yet.`,
+        nodeId: item.node.id,
+      });
+      return;
+    }
+
     if (neighbours.length === 0 && nodes.length > 1) {
       issues.push({
         id: `orphan-${item.node.id}`,
