@@ -1,6 +1,7 @@
 import {
   attr,
   block,
+  bool,
   dnsName,
   flag,
   list,
@@ -200,7 +201,6 @@ export const gcpMajorServices: ServiceDefinition[] = [
       combo("event_type", "Event type", ["google.cloud.pubsub.topic.v1.messagePublished", "google.cloud.storage.object.v1.finalized", "google.cloud.audit.log.v1.written"]),
       text("destination_service", "Cloud Run service name", "application-service"),
       text("transport_topic", "Pub/Sub transport topic id", "", "Optional full Pub/Sub topic id."),
-      number("max_attempts", "Maximum delivery attempts", "5"),
     ],
     emit: (c) => [resource("google_eventarc_trigger", c.name, [
       attr("name", str(dnsName(c.display, "event-trigger", 63))),
@@ -208,7 +208,6 @@ export const gcpMajorServices: ServiceDefinition[] = [
       block("matching_criteria", [], [attr("attribute", str("type")), attr("value", str(c.v.event_type || "google.cloud.pubsub.topic.v1.messagePublished"))]),
       block("destination", [], [block("cloud_run_service", [], [attr("service", str(c.v.destination_service || "application-service")), attr("region", raw("var.region"))])]),
       ...(c.v.transport_topic ? [block("transport", [], [block("pubsub", [], [attr("topic", str(c.v.transport_topic))])])] : []),
-      block("retry_policy", [], [attr("max_attempts", num(c.v.max_attempts, 5))]),
       attr("labels", c.tags),
     ])],
   }),
@@ -237,7 +236,9 @@ export const gcpMajorServices: ServiceDefinition[] = [
           attr("purpose", str(c.v.purpose || "ENCRYPT_DECRYPT")),
           attr("rotation_period", str(c.v.rotation_period || "7776000s")),
           attr("destroy_scheduled_duration", str(`${c.v.destroy_days || "30"}d`)),
-          attr("deletion_protection", flag(c.v.deletion_protection, true)),
+          ...(c.v.deletion_protection === "false" ? [] : [
+            block("lifecycle", [], [attr("prevent_destroy", bool(true))]),
+          ]),
           attr("labels", c.tags),
         ]),
       ];

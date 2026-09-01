@@ -25,7 +25,7 @@ import type {
 import type { HclEntry } from "../hcl";
 import { buildGraph } from "./graph";
 
-const resolveAttribute = (target: RefTarget, attribute: RefAttribute): string =>
+const resolveAttribute = (target: RefTarget, attribute: RefAttribute): string | undefined =>
   typeof attribute === "function"
     ? attribute(target)
     : `${target.tfType}.${target.name}.${attribute}`;
@@ -249,10 +249,13 @@ export function generate(
     const rolesOf = (roles: ServiceRole | ServiceRole[]) =>
       Array.isArray(roles) ? roles : [roles];
 
-    const reachableMatches = (roles: ServiceRole | ServiceRole[]) =>
+    const deployableMatches = (roles: ServiceRole | ServiceRole[]) =>
       graph
         .findByRole(item.node.id, rolesOf(roles))
-        .filter((match) => Number.isFinite(match.distance));
+        .filter((match) => match.item.service.iacSupport !== "diagram");
+
+    const reachableMatches = (roles: ServiceRole | ServiceRole[]) =>
+      deployableMatches(roles).filter((match) => Number.isFinite(match.distance));
 
     const noteFallback = (spec: VariableSpec) => {
       unresolved.push({
@@ -268,35 +271,39 @@ export function generate(
       display: item.node.values.name || item.service.name,
       v: item.node.values,
       tags: raw("local.tags"),
-      connected: (graph.neighbours.get(item.node.id) ?? []).length > 0,
-      has: (roles) =>
-        graph.findByRole(item.node.id, rolesOf(roles)).some((match) => match.distance === 1),
+      connected: (graph.neighbours.get(item.node.id) ?? []).some((nodeId) => {
+        const neighbour = graph.byId.get(nodeId);
+        return neighbour !== undefined && neighbour.service.iacSupport !== "diagram";
+      }),
+      has: (roles) => deployableMatches(roles).some((match) => match.distance === 1),
       variable: declareVariable,
       output: (spec) => outputs.push(spec),
       data: (key, entry) => {
         if (!dataSources.has(key)) dataSources.set(key, entry);
       },
       ref: (roles, attribute, fallback) => {
-        const all = graph.findByRole(item.node.id, rolesOf(roles));
-        const reachable = all.filter((match) => Number.isFinite(match.distance));
+        const all = deployableMatches(roles)
+          .map((match) => ({ match, expression: resolveAttribute(match.item.target, attribute) }))
+          .filter((candidate) => candidate.expression !== undefined);
+        const reachable = all.filter((candidate) => Number.isFinite(candidate.match.distance));
         // Prefer a connected resource; otherwise accept a lone unconnected one
         // of the right role, which is almost always what the author meant.
         const chosen = reachable[0] ?? (all.length === 1 ? all[0] : undefined);
-        if (chosen) return raw(resolveAttribute(chosen.item.target, attribute));
+        if (chosen?.expression) return raw(chosen.expression);
         noteFallback(fallback);
         return declareVariable(fallback);
       },
       refList: (roles, attribute, fallback) => {
-        const reachable = reachableMatches(roles);
+        const reachable = reachableMatches(roles)
+          .map((match) => ({ match, expression: resolveAttribute(match.item.target, attribute) }))
+          .filter((candidate) => candidate.expression !== undefined);
         if (reachable.length > 0) {
           // A diagram can contain many resources of the same role. Only use
           // the closest connected tier so an ALB wired to public subnets does
           // not also absorb private/data subnets through the VPC graph.
-          const nearestDistance = reachable[0].distance;
-          const nearest = reachable.filter((match) => match.distance === nearestDistance);
-          return listOf(
-            nearest.map((match) => raw(resolveAttribute(match.item.target, attribute))),
-          );
+          const nearestDistance = reachable[0].match.distance;
+          const nearest = reachable.filter((candidate) => candidate.match.distance === nearestDistance);
+          return listOf(nearest.map((candidate) => raw(candidate.expression!)));
         }
         noteFallback(fallback);
         return declareVariable(fallback);

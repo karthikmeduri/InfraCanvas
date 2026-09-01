@@ -85,11 +85,7 @@ export const awsMajorServices: ServiceDefinition[] = [
           attr("name", str(dnsName(c.display, "environment", 40))),
           attr("application", raw(`aws_elastic_beanstalk_application.${appName}.name`)),
           attr("solution_stack_name", str(c.v.solution_stack)),
-          block("tier", [], [
-            attr("name", str(c.v.tier || "WebServer")),
-            attr("type", str("Standard")),
-            attr("version", str("1.0")),
-          ]),
+          attr("tier", str(c.v.tier || "WebServer")),
           attr("wait_for_ready_timeout", str(c.v.wait_for_ready === "false" ? "0m" : "20m")),
           attr("tags", c.tags),
         ]),

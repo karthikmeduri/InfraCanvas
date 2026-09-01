@@ -32,6 +32,11 @@ const CONTAINER_ENVIRONMENT: VariableSpec = {
   type: "string",
   description: "Existing Container Apps environment id.",
 };
+const CONTAINER_ENVIRONMENT_SUBNET: VariableSpec = {
+  name: "container_app_environment_subnet_id",
+  type: "string",
+  description: "Delegated infrastructure subnet id for the Container Apps environment.",
+};
 const SYNAPSE_PASSWORD: VariableSpec = {
   name: "synapse_sql_administrator_password",
   type: "string",
@@ -82,14 +87,25 @@ export const azureMajorServices: ServiceDefinition[] = [
       toggle("zone_redundancy", "Zone redundancy", false),
       text("infrastructure_subnet_id", "Infrastructure subnet id", "", "Optional delegated subnet id."),
     ],
-    emit: (c) => [resource("azurerm_container_app_environment", c.name, [
-      attr("name", str(dnsName(c.display, "container-environment", 60))),
-      ...scope(),
-      attr("zone_redundancy_enabled", flag(c.v.zone_redundancy, false)),
-      ...(c.v.infrastructure_subnet_id ? [attr("infrastructure_subnet_id", str(c.v.infrastructure_subnet_id))] : []),
-      ...(c.has("monitoring") ? [attr("log_analytics_workspace_id", c.ref("monitoring", "id", LOG_WORKSPACE))] : []),
-      attr("tags", c.tags),
-    ])],
+    emit: (c) => {
+      const needsInfrastructureSubnet =
+        Boolean(c.v.infrastructure_subnet_id) || c.has("subnet") || c.v.zone_redundancy !== "false";
+      const infrastructureSubnet = c.v.infrastructure_subnet_id
+        ? str(c.v.infrastructure_subnet_id)
+        : needsInfrastructureSubnet
+          ? c.ref("subnet", "id", CONTAINER_ENVIRONMENT_SUBNET)
+          : undefined;
+      return [resource("azurerm_container_app_environment", c.name, [
+        attr("name", str(dnsName(c.display, "container-environment", 60))),
+        ...scope(),
+        ...(infrastructureSubnet ? [
+          attr("infrastructure_subnet_id", infrastructureSubnet),
+          attr("zone_redundancy_enabled", flag(c.v.zone_redundancy, false)),
+        ] : []),
+        ...(c.has("monitoring") ? [attr("log_analytics_workspace_id", c.ref("monitoring", "id", LOG_WORKSPACE))] : []),
+        attr("tags", c.tags),
+      ])];
+    },
   }),
   defineService({
     id: "container_apps",
@@ -114,7 +130,7 @@ export const azureMajorServices: ServiceDefinition[] = [
       return [resource("azurerm_container_app", c.name, [
         attr("name", str(dnsName(c.display, "container-app", 32))),
         attr("resource_group_name", RG),
-        attr("container_app_environment_id", c.ref("container", (target) => target.tfType === "azurerm_container_app_environment" ? `${target.tfType}.${target.name}.id` : "var.container_app_environment_id", CONTAINER_ENVIRONMENT)),
+        attr("container_app_environment_id", c.ref("container", (target) => target.tfType === "azurerm_container_app_environment" ? `${target.tfType}.${target.name}.id` : undefined, CONTAINER_ENVIRONMENT)),
         attr("revision_mode", str("Single")),
         block("template", [], [
           attr("min_replicas", num(c.v.min_replicas, 1)),

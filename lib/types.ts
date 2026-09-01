@@ -77,7 +77,7 @@ export type RefTarget = {
  * expression, for cases where the referenced address differs from the matched
  * resource's primary type (an ALB's target group, for example).
  */
-export type RefAttribute = string | ((target: RefTarget) => string);
+export type RefAttribute = string | ((target: RefTarget) => string | undefined);
 
 export type EmitContext = {
   provider: ProviderId;

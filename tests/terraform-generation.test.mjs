@@ -89,9 +89,49 @@ for (const provider of providers) {
       "subnets should reference the diagram's network resource, not a placeholder",
     );
     assert.doesNotMatch(main, /= null\b/, "no null placeholders should survive generation");
+    assert.doesNotMatch(
+      main,
+      /diagram_only\./,
+      "deployable resources must never reference diagram-only catalog entries",
+    );
   });
 }
 
+test("schema-sensitive services emit provider-compatible Terraform", () => {
+  const aws = providers.find((item) => item.id === "aws");
+  const beanstalk = aws.services.find((service) => service.id === "beanstalk");
+  const awsResult = generate(
+    aws,
+    [{ id: "beanstalk", serviceId: "beanstalk", x: 0, y: 0, values: defaultValues(beanstalk, 1) }],
+    [],
+    "beanstalk schema",
+  );
+  const awsMain = awsResult.files.find((file) => file.path === "main.tf").contents;
+  assert.match(awsMain, /\btier\s+=\s+"WebServer"/);
+  assert.doesNotMatch(awsMain, /\btier\s+\{/);
+
+  const azure = providers.find((item) => item.id === "azure");
+  const containerApp = azure.services.find((service) => service.id === "container_apps");
+  const azureResult = generate(
+    azure,
+    [{ id: "container-app", serviceId: "container_apps", x: 0, y: 0, values: defaultValues(containerApp, 1) }],
+    [],
+    "container app schema",
+  );
+  const azureVariables = azureResult.files.find((file) => file.path === "variables.tf").contents;
+  assert.match(azureVariables, /variable "container_app_environment_id"/);
+
+  const gcp = providers.find((item) => item.id === "gcp");
+  const gcpNodes = ["eventarc", "kms"].map((serviceId, index) => {
+    const service = gcp.services.find((item) => item.id === serviceId);
+    return { id: serviceId, serviceId, x: index * 200, y: 0, values: defaultValues(service, index + 1) };
+  });
+  const gcpResult = generate(gcp, gcpNodes, [], "gcp schema");
+  const gcpMain = gcpResult.files.find((file) => file.path === "main.tf").contents;
+  assert.doesNotMatch(gcpMain, /resource "google_eventarc_trigger"[\s\S]*?retry_policy\s+\{/);
+  assert.doesNotMatch(gcpMain, /resource "google_kms_crypto_key"[\s\S]*?deletion_protection\s+=/);
+  assert.match(gcpMain, /resource "google_kms_crypto_key"[\s\S]*?prevent_destroy\s+=\s+true/);
+});
 test("disconnected resources fall back to declared input variables", () => {
   const provider = providers.find((item) => item.id === "aws");
   const ec2 = provider.services.find((service) => service.id === "ec2");
