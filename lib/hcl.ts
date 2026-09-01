@@ -169,8 +169,8 @@ function renderBody(body: HclEntry[], indent: string): string {
         index += 1;
       }
 
-      // `terraform fmt` aligns `=` only across consecutive single-line
-      // arguments; a multi-line value breaks the group on both sides.
+      // `terraform fmt` breaks alignment around multiline collections and
+      // function calls, while indented heredocs remain part of the argument run.
       let group: typeof run = [];
       const flush = () => {
         if (group.length === 0) return;
@@ -182,7 +182,7 @@ function renderBody(body: HclEntry[], indent: string): string {
       };
 
       run.forEach((item) => {
-        if (item.rendered.includes("\n")) {
+        if (item.rendered.includes("\n") && !item.rendered.startsWith("<<-")) {
           flush();
           lines.push(`${indent}${item.name} = ${item.rendered}`);
           return;

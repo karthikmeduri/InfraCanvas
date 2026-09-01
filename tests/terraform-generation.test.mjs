@@ -137,7 +137,7 @@ test("AWS secure reference architecture is complete and wires protected private 
 
   assert.deepEqual(
     [...categories].sort(),
-    ["Compute", "Containers", "Database", "Integration", "Networking", "Observability", "Security", "Storage"].sort(),
+    [...new Set(provider.services.filter((service) => service.iacSupport !== "diagram").map((service) => service.category))].sort(),
     "the reference should demonstrate every resource category",
   );
 
@@ -178,7 +178,11 @@ test("every cloud ships a complete production reference architecture", () => {
       return { id: `sample-edge-${index}`, from: nodes[from].id, to: nodes[to].id };
     });
     const expectedCategories = [
-      ...new Set(provider.services.map((service) => service.category)),
+      ...new Set(
+        provider.services
+          .filter((service) => service.iacSupport !== "diagram")
+          .map((service) => service.category),
+      ),
     ].sort();
     const sampleCategories = [
       ...new Set(

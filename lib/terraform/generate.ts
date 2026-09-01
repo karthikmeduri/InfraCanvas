@@ -207,6 +207,8 @@ export type GenerationResult = {
   /** Resources that fell back to an input variable because an edge was missing. */
   unresolved: { nodeId: string; label: string; variable: string }[];
   resourceCount: number;
+  /** Official architecture services intentionally excluded from deployable code. */
+  diagramOnly: { nodeId: string; name: string; service: string }[];
   /** Input contract reused by Pulumi's generated local-module SDK. */
   variables: VariableSpec[];
   /** Output contract exposed by both Terraform and Pulumi bundles. */
@@ -220,6 +222,13 @@ export function generate(
   projectName: string,
 ): GenerationResult {
   const graph = buildGraph(provider, nodes, edges);
+  const diagramOnly: GenerationResult["diagramOnly"] = graph.ordered
+    .filter((item) => item.service.iacSupport === "diagram")
+    .map((item) => ({
+      nodeId: item.node.id,
+      name: item.node.values.name || item.service.name,
+      service: item.service.name,
+    }));
 
   const variables = new Map<string, VariableSpec>();
   baseVariables(provider, projectName).forEach((spec) => variables.set(spec.name, spec));
@@ -358,9 +367,16 @@ export function generate(
     });
   }
   mainEntries.push(...resourceEntries);
+  if (diagramOnly.length > 0) {
+    mainEntries.push(
+      { kind: "blank" },
+      comment("Diagram-only services (not emitted as unverified provider resources)"),
+      ...diagramOnly.map((item) => comment(`${item.service} — ${item.name}`)),
+    );
+  }
 
   const mainFile = render(
-    resourceEntries.length > 0
+    resourceEntries.length > 0 || diagramOnly.length > 0
       ? mainEntries
       : [comment("Drop resources onto the InfraCanvas grid to generate infrastructure.")],
   );
@@ -416,6 +432,7 @@ export function generate(
     ],
     unresolved,
     resourceCount,
+    diagramOnly,
     variables: [...variables.values()],
     outputs,
   };
@@ -446,7 +463,7 @@ function bundleReadme(
   const rows = graph.ordered
     .map(
       (item) =>
-        `| \`${item.address}\` | ${item.service.name} | ${item.service.category} |`,
+        `| ${item.service.iacSupport === "diagram" ? "_Diagram only_" : `\`${item.address}\``} | ${item.service.name} | ${item.service.category} | ${item.service.iacSupport === "diagram" ? "Architecture" : "IaC ready"} |`,
     )
     .join("\n");
 
@@ -472,9 +489,11 @@ ${mermaidEdges}
 
 ## Resources
 
-| Address | Service | Category |
-| --- | --- | --- |
-${rows || "| _none_ | | |"}
+| Address | Service | Category | Generation |
+| --- | --- | --- | --- |
+${rows || "| _none_ | | | |"}
+
+${graph.ordered.some((item) => item.service.iacSupport === "diagram") ? "> **Generation boundary:** Diagram-only services use official provider artwork and remain in the architecture export, but are intentionally omitted from Terraform and Pulumi until their required provider configuration is modeled.\n" : ""}
 
 ## Usage
 

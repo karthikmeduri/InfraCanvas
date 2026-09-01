@@ -19,6 +19,13 @@ import {
   serviceById,
 } from "@/lib/catalog";
 import { defaultValues } from "@/lib/catalog/helpers";
+import {
+  AI_ARCHITECT_EXAMPLES,
+  createLocalArchitectureDraft,
+  normalizeArchitecturePlan,
+  planNodeDefaults,
+  type ArchitecturePlan,
+} from "@/lib/ai-architect";
 import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
 import { StateLensWorkspace, type LoadedState } from "@/app/components/StateLensWorkspace";
 import {
@@ -29,9 +36,10 @@ import {
   type TfwhyFinding,
 } from "@/lib/drift";
 import { diagramToSvg, svgToPngBlob } from "@/lib/export-diagram";
+import { removeDiagramEdge } from "@/lib/diagram";
 import { safeName } from "@/lib/hcl";
 import { HighlightedCode } from "@/lib/highlight";
-import { ProviderMark, ServiceGlyph } from "@/lib/icons";
+import { ProviderMark, ServiceArtwork } from "@/lib/icons";
 import { generatePulumi } from "@/lib/pulumi/generate";
 import { generate } from "@/lib/terraform/generate";
 import { parseStateFile } from "@/lib/state-lens";
@@ -66,8 +74,14 @@ type Doc = { nodes: DiagramNode[]; edges: DiagramEdge[] };
 type SavedDraft = DiagramState & { savedAt?: string };
 type Marquee = { x: number; y: number; width: number; height: number };
 type IacTarget = "terraform" | "pulumi";
+type CatalogFilter = "all" | "deployable" | "diagram";
 
 const emptyDoc: Doc = { nodes: [], edges: [] };
+
+const collapsedCatalogCategories = (providerId: ProviderId) => {
+  const categories = [...new Set(providerById(providerId).services.map((service) => service.category))];
+  return categories.slice(1);
+};
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -124,8 +138,11 @@ export default function Home() {
   const [selection, setSelection] = useState<string[]>([]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
-  const [collapsedCategories, setCollapsedCategories] = useState<string[]>([]);
+  const [collapsedCategories, setCollapsedCategories] = useState<string[]>(() =>
+    collapsedCatalogCategories("aws"),
+  );
   const [search, setSearch] = useState("");
+  const [catalogFilter, setCatalogFilter] = useState<CatalogFilter>("all");
 
   const [zoom, setZoom] = useState(1);
   const [snapToGrid, setSnapToGrid] = useState(false);
@@ -150,6 +167,13 @@ export default function Home() {
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
   const [examplePromptOpen, setExamplePromptOpen] = useState(false);
+  const [aiArchitectOpen, setAiArchitectOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiPlan, setAiPlan] = useState<ArchitecturePlan | null>(null);
+  const [aiPlanning, setAiPlanning] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiGuideNodeIds, setAiGuideNodeIds] = useState<string[]>([]);
+  const [aiGuideIndex, setAiGuideIndex] = useState(0);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
@@ -160,6 +184,7 @@ export default function Home() {
   const issuesPanelRef = useRef<HTMLDivElement>(null);
   const providerDialogRef = useRef<HTMLElement>(null);
   const decisionDialogRef = useRef<HTMLElement>(null);
+  const aiDialogRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const driftInputRef = useRef<HTMLInputElement>(null);
   const stateLensInputRef = useRef<HTMLInputElement>(null);
@@ -195,6 +220,12 @@ export default function Home() {
   const selectedNodes = nodes.filter((node) => selection.includes(node.id));
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
   const selectedService = selectedNode ? serviceById(provider, selectedNode.serviceId) : undefined;
+  const selectedEdge = selectedEdgeId
+    ? edges.find((edge) => edge.id === selectedEdgeId) ?? null
+    : null;
+  const selectedEdgeFrom = selectedEdge ? nodes.find((node) => node.id === selectedEdge.from) : undefined;
+  const selectedEdgeTo = selectedEdge ? nodes.find((node) => node.id === selectedEdge.to) : undefined;
+  const aiGuideNodeId = aiGuideNodeIds[aiGuideIndex];
 
   const generated = generate(provider, nodes, edges, projectName);
   const pulumiGenerated = generatePulumi(provider, generated, projectName);
@@ -214,24 +245,38 @@ export default function Home() {
   const currentFile =
     activeGenerated.files.find((file) => file.path === activeFile) ?? activeGenerated.files[0];
 
+  const deployableServiceCount = provider.services.filter(
+    (service) => service.iacSupport !== "diagram",
+  ).length;
+  const diagramServiceCount = provider.services.length - deployableServiceCount;
+  const diagramOnlyNodeCount = nodes.filter(
+    (node) => serviceById(provider, node.serviceId)?.iacSupport === "diagram",
+  ).length;
+
   const groupedServices = (() => {
     const query = search.trim().toLowerCase();
-    const filtered = provider.services.filter((service) =>
-      query.length === 0
-        ? true
-        : `${service.name} ${service.short} ${service.category} ${service.description} ${service.tfType}`
-            .toLowerCase()
-            .includes(query),
-    );
+    const filtered = provider.services.filter((service) => {
+      const support = service.iacSupport === "diagram" ? "diagram" : "deployable";
+      if (catalogFilter !== "all" && support !== catalogFilter) return false;
+      if (query.length === 0) return true;
+      return `${service.name} ${service.short} ${service.category} ${service.productFamily ?? ""} ${service.description} ${service.tfType} ${support}`
+        .toLowerCase()
+        .includes(query);
+    });
     const groups = new Map<string, ServiceDefinition[]>();
     filtered.forEach((service) => {
       const bucket = groups.get(service.category) ?? [];
       bucket.push(service);
       groups.set(service.category, bucket);
     });
-    return [...groups.entries()].sort(
-      (a, b) => CATEGORY_ORDER.indexOf(a[0]) - CATEGORY_ORDER.indexOf(b[0]),
-    );
+    return [...groups.entries()].sort((a, b) => {
+      const aIndex = CATEGORY_ORDER.indexOf(a[0]);
+      const bIndex = CATEGORY_ORDER.indexOf(b[0]);
+      if (aIndex === -1 && bIndex === -1) return a[0].localeCompare(b[0]);
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
   })();
 
   const activeStep = providerPickerOpen ? 0 : codeOpen ? 2 : 1;
@@ -274,6 +319,7 @@ export default function Home() {
   const notify = (message: string) => setToast(message);
 
   const showBuilder = () => {
+    setAiArchitectOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
@@ -282,6 +328,7 @@ export default function Home() {
   };
 
   const showDrift = (fromWelcome = false) => {
+    setAiArchitectOpen(false);
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setStateLensOpen(false);
@@ -290,6 +337,7 @@ export default function Home() {
   };
 
   const showStateLens = (fromWelcome = false) => {
+    setAiArchitectOpen(false);
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
@@ -298,10 +346,65 @@ export default function Home() {
   };
 
   const showGeneratedCode = () => {
+    setAiArchitectOpen(false);
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
     setCodeOpen(true);
+  };
+
+  const showAiArchitect = () => {
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setExamplePromptOpen(false);
+    setAiPlan(null);
+    setAiError("");
+    setAiArchitectOpen(true);
+  };
+
+  const requestAiArchitecture = async () => {
+    const prompt = aiPrompt.trim();
+    if (prompt.length < 12) {
+      setAiError("Describe the workload, users, data, availability, and security needs in a little more detail.");
+      return;
+    }
+
+    setAiPlanning(true);
+    setAiError("");
+    try {
+      const response = await fetch("/api/architect", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ providerId, prompt }),
+      });
+      const payload = await response.json().catch(() => null) as
+        | { plan?: unknown; code?: string; message?: string }
+        | null;
+
+      if (response.ok && payload?.plan) {
+        const plan = normalizeArchitecturePlan(provider, payload.plan, "ai");
+        if (plan.nodes.length === 0) throw new Error("The AI plan did not contain supported resources.");
+        setAiPlan(plan);
+        return;
+      }
+      if (payload?.code !== "AI_NOT_CONFIGURED") {
+        throw new Error(payload?.message || "The AI architect could not create a plan.");
+      }
+
+      setAiPlan(createLocalArchitectureDraft(provider, prompt));
+      notify("AI service is not configured — a local catalog-backed draft was created");
+    } catch (error) {
+      // Keep the workflow usable during local development or a temporary API
+      // outage, while clearly identifying that this is not a model response.
+      setAiPlan(createLocalArchitectureDraft(provider, prompt));
+      setAiError(
+        `${error instanceof Error ? error.message : "The AI planner is unavailable"} A local catalog-backed draft is ready for review instead.`,
+      );
+    } finally {
+      setAiPlanning(false);
+    }
   };
 
   const importDriftFile = async (file?: File) => {
@@ -366,10 +469,15 @@ export default function Home() {
     if (!stateLensImport) return;
     const { preview, fileName } = stateLensImport;
     setProviderId(preview.providerId);
+    setCollapsedCategories(collapsedCatalogCategories(preview.providerId));
+    setSearch("");
+    setCatalogFilter("all");
     setProjectName(`${providerById(preview.providerId).shortName} · ${fileName.replace(/\.(tfstate|json)$/i, "")}`);
     commit(() => ({ nodes: preview.nodes, edges: preview.edges }));
     setSelection([]);
     setSelectedEdgeId(null);
+    setAiGuideNodeIds([]);
+    setAiGuideIndex(0);
     setProviderPickerOpen(false);
     setExamplePromptOpen(false);
     setStartupProvider(null);
@@ -431,6 +539,7 @@ export default function Home() {
       const validIds = new Set(validNodes.map((node) => node.id));
 
       setProviderId(parsed.providerId);
+      setCollapsedCategories(collapsedCatalogCategories(parsed.providerId));
       setSavedDraft({
         providerId: parsed.providerId,
         projectName: parsed.projectName ?? "Production web platform",
@@ -463,6 +572,10 @@ export default function Home() {
       decisionDialogRef.current?.focus();
     }
   }, [examplePromptOpen, pendingProvider, startupProvider]);
+
+  useEffect(() => {
+    if (aiArchitectOpen) aiDialogRef.current?.focus();
+  }, [aiArchitectOpen, aiPlan]);
 
   useEffect(() => {
     if (providerPickerOpen || codeOpen || nodes.length > 0) return;
@@ -537,6 +650,8 @@ export default function Home() {
   const loadSample =
     (targetProvider: ProviderId) => {
       setExamplePromptOpen(false);
+      setAiGuideNodeIds([]);
+      setAiGuideIndex(0);
       const definition = providerById(targetProvider);
       const layout = SAMPLE_ARCHITECTURES[targetProvider];
       const sampleNodes: DiagramNode[] = layout.flatMap((entry, index) => {
@@ -613,6 +728,9 @@ export default function Home() {
     (nextId: ProviderId, withSample: boolean) => {
       const definition = providerById(nextId);
       setProviderId(nextId);
+      setCollapsedCategories(collapsedCatalogCategories(nextId));
+      setSearch("");
+      setCatalogFilter("all");
       setProviderPickerOpen(false);
       setPendingProvider(null);
       setStartupProvider(null);
@@ -625,6 +743,8 @@ export default function Home() {
       setDriftReport(null);
       setDriftImportError("");
       setSearch("");
+      setAiGuideNodeIds([]);
+      setAiGuideIndex(0);
       if (withSample) {
         loadSample(nextId);
       } else {
@@ -642,6 +762,9 @@ export default function Home() {
       if (nodes.length === 0) {
         if (!storageReady) return;
         setProviderId(nextId);
+        setCollapsedCategories(collapsedCatalogCategories(nextId));
+        setSearch("");
+        setCatalogFilter("all");
         setProviderPickerOpen(false);
         if (savedDraft) {
           setStartupProvider(nextId);
@@ -665,6 +788,9 @@ export default function Home() {
       if (suffix) idCounter.current = Math.max(idCounter.current, Number(suffix[1]));
     });
     setProviderId(savedDraft.providerId);
+    setCollapsedCategories(collapsedCatalogCategories(savedDraft.providerId));
+    setSearch("");
+    setCatalogFilter("all");
     setProjectName(savedDraft.projectName);
     setDoc({ nodes: savedDraft.nodes, edges: savedDraft.edges });
     setPast([]);
@@ -680,17 +806,22 @@ export default function Home() {
     setDriftImportError("");
     setStartupProvider(null);
     setExamplePromptOpen(false);
+    setAiGuideNodeIds([]);
+    setAiGuideIndex(0);
     notify(`Resumed ${savedDraft.projectName}`);
+  };
+
+  const deleteConnection = (edgeId: string) => {
+    const exists = edges.some((edge) => edge.id === edgeId);
+    if (!exists) return;
+    commit((current) => removeDiagramEdge(current, edgeId));
+    if (selectedEdgeId === edgeId) setSelectedEdgeId(null);
+    notify("Selected connection removed — both resources were kept");
   };
 
   const deleteSelection = () => {
     if (selectedEdgeId) {
-      commit((current) => ({
-        ...current,
-        edges: current.edges.filter((edge) => edge.id !== selectedEdgeId),
-      }));
-      setSelectedEdgeId(null);
-      notify("Connection removed");
+      deleteConnection(selectedEdgeId);
       return;
     }
     if (selection.length === 0) return;
@@ -700,6 +831,7 @@ export default function Home() {
       edges: current.edges.filter((edge) => !removing.has(edge.from) && !removing.has(edge.to)),
     }));
     setSelection([]);
+    setAiGuideNodeIds((current) => current.filter((id) => !removing.has(id)));
     notify(selection.length === 1 ? "Resource removed" : `${selection.length} resources removed`);
   };
 
@@ -747,6 +879,8 @@ export default function Home() {
     setZoom(1);
     setDriftReport(null);
     setDriftImportError("");
+    setAiGuideNodeIds([]);
+    setAiGuideIndex(0);
     setExamplePromptOpen(true);
     notify("Canvas cleared");
   };
@@ -851,6 +985,98 @@ export default function Home() {
         behavior: "smooth",
       });
     };
+
+  const applyAiArchitecture = () => {
+    if (!aiPlan || aiPlan.nodes.length === 0) return;
+
+    const levels = Array.from({ length: aiPlan.nodes.length }, () => 0);
+    for (let pass = 0; pass < aiPlan.nodes.length; pass += 1) {
+      let changed = false;
+      aiPlan.edges.forEach((edge) => {
+        const next = Math.min(aiPlan.nodes.length - 1, levels[edge.from] + 1);
+        if (next > levels[edge.to]) {
+          levels[edge.to] = next;
+          changed = true;
+        }
+      });
+      if (!changed) break;
+    }
+
+    const columns = new Map<number, number[]>();
+    levels.forEach((level, index) => columns.set(level, [...(columns.get(level) ?? []), index]));
+    const maxLevel = Math.max(0, ...levels);
+    const graphWidth = maxLevel * 270 + NODE_WIDTH;
+    const maxStartX = Math.max(180, CANVAS_WIDTH - graphWidth - 180);
+    const startX = clamp((CANVAS_WIDTH - graphWidth) / 2, 180, maxStartX);
+    const ids: string[] = [];
+    const plannedNodes: DiagramNode[] = aiPlan.nodes.map((node, index) => {
+      const id = nextId(node.serviceId);
+      ids.push(id);
+      const column = columns.get(levels[index]) ?? [index];
+      const row = column.indexOf(index);
+      const columnHeight = (column.length - 1) * 142 + NODE_HEIGHT;
+      const startY = clamp((CANVAS_HEIGHT - columnHeight) / 2, 160, CANVAS_HEIGHT - columnHeight - 160);
+      return {
+        id,
+        serviceId: node.serviceId,
+        x: clamp(startX + levels[index] * 270, 0, CANVAS_WIDTH - NODE_WIDTH),
+        y: clamp(startY + row * 142, 0, CANVAS_HEIGHT - NODE_HEIGHT),
+        values: planNodeDefaults(provider, node, index + 1),
+      };
+    });
+    const plannedEdges: DiagramEdge[] = aiPlan.edges.flatMap((edge) => {
+      const from = ids[edge.from];
+      const to = ids[edge.to];
+      return from && to ? [{ id: nextId("edge"), from, to }] : [];
+    });
+
+    commit(() => ({ nodes: plannedNodes, edges: plannedEdges }));
+    setProjectName(aiPlan.title);
+    setSelection(ids[0] ? [ids[0]] : []);
+    setSelectedEdgeId(null);
+    setAiGuideNodeIds(ids);
+    setAiGuideIndex(0);
+    setAiArchitectOpen(false);
+    setAiPlan(null);
+    setAiError("");
+    setMobileInspectorOpen(true);
+
+    const minX = Math.min(...plannedNodes.map((node) => node.x));
+    const minY = Math.min(...plannedNodes.map((node) => node.y));
+    const maxX = Math.max(...plannedNodes.map((node) => node.x + NODE_WIDTH));
+    const maxY = Math.max(...plannedNodes.map((node) => node.y + NODE_HEIGHT));
+    const canvas = canvasRef.current;
+    const nextZoom = canvas
+      ? clamp(
+          Math.min(
+            (canvas.clientWidth - 96) / Math.max(1, maxX - minX),
+            (canvas.clientHeight - 120) / Math.max(1, maxY - minY),
+          ),
+          0.38,
+          0.95,
+        )
+      : 0.7;
+    setZoom(nextZoom);
+    window.requestAnimationFrame(() => {
+      canvas?.scrollTo({
+        left: Math.max(0, ((minX + maxX) / 2) * nextZoom - (canvas?.clientWidth ?? 0) / 2),
+        top: Math.max(0, ((minY + maxY) / 2) * nextZoom - (canvas?.clientHeight ?? 0) / 2),
+        behavior: "smooth",
+      });
+    });
+    notify(`${plannedNodes.length} editable resources created — review configuration 1 of ${plannedNodes.length}`);
+  };
+
+  const selectAiGuideStep = (index: number) => {
+    const bounded = clamp(index, 0, Math.max(0, aiGuideNodeIds.length - 1));
+    const nodeId = aiGuideNodeIds[bounded];
+    if (!nodeId) return;
+    setAiGuideIndex(bounded);
+    setSelection([nodeId]);
+    setSelectedEdgeId(null);
+    setMobileInspectorOpen(true);
+    window.requestAnimationFrame(() => revealNode(nodeId));
+  };
 
   const focusDriftNode = (nodeId: string) => {
     setWelcomeFeature(null);
@@ -1034,6 +1260,8 @@ export default function Home() {
   const handleNodeActivate =
     (nodeId: string) => {
       if (!connectMode) {
+        const guideIndex = aiGuideNodeIds.indexOf(nodeId);
+        if (guideIndex >= 0) setAiGuideIndex(guideIndex);
         setSelection([nodeId]);
         setSelectedEdgeId(null);
         setMobileInspectorOpen(true);
@@ -1218,6 +1446,7 @@ export default function Home() {
   // The listener is attached once; this ref keeps it pointed at the latest
   // command closures without re-subscribing on every render.
   const commandsRef = useRef({
+    aiArchitectOpen,
     cancelConnection,
     codeOpen,
     connectMode,
@@ -1238,6 +1467,7 @@ export default function Home() {
   });
   useEffect(() => {
     commandsRef.current = {
+      aiArchitectOpen,
       cancelConnection,
       codeOpen,
       connectMode,
@@ -1261,6 +1491,7 @@ export default function Home() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const {
+        aiArchitectOpen,
         cancelConnection,
         codeOpen,
         connectMode,
@@ -1283,6 +1514,12 @@ export default function Home() {
       const mod = event.metaKey || event.ctrlKey;
 
       if (event.key === "Escape") {
+        if (aiArchitectOpen) {
+          setAiArchitectOpen(false);
+          setAiPlan(null);
+          setAiError("");
+          return;
+        }
         if (shortcutsOpen) return setShortcutsOpen(false);
         if (examplePromptOpen) return setExamplePromptOpen(false);
         if (startupProvider) {
@@ -1458,9 +1695,9 @@ export default function Home() {
             Save
           </button>
           <button
-            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen ? "active" : ""}`}
+            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen ? "active" : ""}`}
             onClick={showBuilder}
-            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen}
+            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen}
             title="Return to the architecture builder"
           >
             <span className="builder-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
@@ -1485,6 +1722,15 @@ export default function Home() {
             <span className="statelens-nav-icon" aria-hidden="true"><i /><i /></span>
             StateLens
             {stateLensImport && <b>{stateLensImport.preview.matched.length}</b>}
+          </button>
+          <button
+            className={`ai-nav-button ${aiArchitectOpen ? "active" : ""}`}
+            onClick={showAiArchitect}
+            aria-pressed={aiArchitectOpen}
+            title="Create a configurable architecture from a natural-language brief"
+          >
+            <span className="ai-nav-icon" aria-hidden="true"><i /><i /><i /></span>
+            AI Architect
           </button>
           <button
             className={`generate-button ${codeOpen ? "active" : ""}`}
@@ -1553,11 +1799,15 @@ export default function Home() {
           <span>{nodes.length} resources</span>
           <span>{edges.length} connections</span>
           <span>{generated.resourceCount} IaC resource blocks</span>
+          {diagramOnlyNodeCount > 0 && <span>{diagramOnlyNodeCount} diagram-only</span>}
         </div>
       </div>
 
       {!codeOpen && !driftOpen && !stateLensOpen && (
-        <section className="workspace">
+        <section
+          className="workspace"
+          style={{ "--provider-accent": provider.accent } as CSSProperties}
+        >
           <aside className={`library-panel ${mobileLibraryOpen ? "mobile-open" : ""}`}>
             <div className="panel-heading provider-heading">
               <button
@@ -1593,9 +1843,30 @@ export default function Home() {
               <kbd>/</kbd>
             </label>
 
+            <div className="catalog-summary" aria-label={`${provider.shortName} service catalog coverage`}>
+              <span><strong>{provider.services.length}</strong> official services</span>
+              <span><i /> {deployableServiceCount} IaC ready</span>
+            </div>
+            <div className="catalog-filters" role="group" aria-label="Filter services by code generation support">
+              {([
+                ["all", "All", provider.services.length],
+                ["deployable", "IaC ready", deployableServiceCount],
+                ["diagram", "Diagram", diagramServiceCount],
+              ] as const).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  className={catalogFilter === value ? "selected" : ""}
+                  onClick={() => setCatalogFilter(value)}
+                  aria-pressed={catalogFilter === value}
+                >
+                  {label}<b>{count}</b>
+                </button>
+              ))}
+            </div>
+
             <div className="service-library">
               {groupedServices.map(([category, items]) => {
-                const collapsed = collapsedCategories.includes(category);
+                const collapsed = search.trim().length === 0 && collapsedCategories.includes(category);
                 return (
                   <section className="service-category" key={category}>
                     <button
@@ -1648,12 +1919,17 @@ export default function Home() {
                               className="service-icon"
                               style={{ "--service-accent": service.accent } as CSSProperties}
                             >
-                              <ServiceGlyph role={service.role} className="service-glyph" />
+                              <ServiceArtwork service={service} className="service-glyph" />
                             </span>
                             <span className="service-copy">
-                              <strong>{service.name}</strong>
+                              <strong>
+                                {service.name}
+                                <em className={`support-badge ${service.iacSupport === "diagram" ? "diagram" : "deployable"}`}>
+                                  {service.iacSupport === "diagram" ? "Diagram" : "IaC"}
+                                </em>
+                              </strong>
                               <small>{service.description}</small>
-                              <code>{service.tfType}</code>
+                              <code>{service.iacSupport === "diagram" ? service.productFamily : service.tfType}</code>
                             </span>
                             <b className="drag-grip" aria-hidden="true">
                               ⠿
@@ -1754,13 +2030,22 @@ export default function Home() {
                 Clear
               </button>
               {nodes.length === 0 && (
-                <button
-                  className="load-example-tool"
-                  onClick={() => setExamplePromptOpen(true)}
-                  title={`Load the secure ${provider.shortName} reference architecture`}
-                >
-                  Load example
-                </button>
+                <>
+                  <button
+                    className="ai-canvas-tool"
+                    onClick={showAiArchitect}
+                    title="Create an architecture from a natural-language brief"
+                  >
+                    Design with AI
+                  </button>
+                  <button
+                    className="load-example-tool"
+                    onClick={() => setExamplePromptOpen(true)}
+                    title={`Load the secure ${provider.shortName} reference architecture`}
+                  >
+                    Load real-world example architecture
+                  </button>
+                </>
               )}
               <span className="toolbar-divider" />
               <button onClick={exportSvg} disabled={nodes.length === 0} title="Export diagram as SVG">
@@ -1848,11 +2133,27 @@ export default function Home() {
                           key={edge.id}
                           className={`edge ${active ? "selected" : ""}`}
                           style={{ "--edge-color": accent } as CSSProperties}
+                          role="button"
+                          tabIndex={handMode ? -1 : 0}
+                          aria-label={`Connection from ${from.values.name || fromService?.name || "resource"} to ${to.values.name || toService?.name || "resource"}`}
                           onClick={(event) => {
                             event.stopPropagation();
                             if (handMode) return;
                             setSelectedEdgeId(edge.id);
                             setSelection([]);
+                            setMobileInspectorOpen(true);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setSelectedEdgeId(edge.id);
+                              setSelection([]);
+                              setMobileInspectorOpen(true);
+                            }
+                            if (event.key === "Delete" || event.key === "Backspace") {
+                              event.preventDefault();
+                              deleteConnection(edge.id);
+                            }
                           }}
                         >
                           <title>{`${from.values.name || fromService?.name || "Resource"} to ${to.values.name || toService?.name || "resource"}`}</title>
@@ -1955,7 +2256,7 @@ export default function Home() {
                           <i aria-hidden="true">+</i>
                         </span>
                         <span className="node-service-icon">
-                          <ServiceGlyph role={service.role} className="node-glyph" />
+                          <ServiceArtwork service={service} className="node-glyph" />
                         </span>
                         <span className="node-copy">
                           <strong>{node.values.name}</strong>
@@ -2102,6 +2403,29 @@ export default function Home() {
                   <button onClick={cancelConnection}>Cancel</button>
                 </div>
               )}
+
+              {selectedEdge && selectedEdgeFrom && selectedEdgeTo && (
+                <div className="edge-selection-toolbar" role="status" aria-live="polite">
+                  <span className="edge-selection-mark" aria-hidden="true"><i /><i /></span>
+                  <span>
+                    <small>Connection selected</small>
+                    <strong>{selectedEdgeFrom.values.name} → {selectedEdgeTo.values.name}</strong>
+                  </span>
+                  <button
+                    className="edge-delete-button"
+                    onClick={() => deleteConnection(selectedEdge.id)}
+                  >
+                    Delete this connection
+                  </button>
+                  <button
+                    className="edge-close-button"
+                    onClick={() => setSelectedEdgeId(null)}
+                    aria-label="Clear connection selection"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
 
             {nodes.length === 0 && (
@@ -2118,19 +2442,31 @@ export default function Home() {
                 </span>
                 <strong>Start composing your architecture</strong>
                 <p>
-                  Drag services from the library, or load a secure real-world {provider.shortName}{" "}
-                  example with {SAMPLE_ARCHITECTURES[provider.id].length} configured resources across
-                  every available category.
+                  Describe your workload to AI, drag services from the library, or load a secure
+                  real-world {provider.shortName} example with {SAMPLE_ARCHITECTURES[provider.id].length}{" "}
+                  configured resources.
                 </p>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    loadSample(provider.id);
-                  }}
-                >
-                  Load real-world example architecture
-                </button>
+                <div className="empty-canvas-actions">
+                  <button
+                    type="button"
+                    className="ai-empty-button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      showAiArchitect();
+                    }}
+                  >
+                    Design with AI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      loadSample(provider.id);
+                    }}
+                  >
+                    Load example
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2207,7 +2543,13 @@ export default function Home() {
             <div className="panel-heading inspector-heading">
               <div>
                 <span className="eyebrow">Configuration</span>
-                <h2>{selectedService ? selectedService.name : "Resource settings"}</h2>
+                <h2>
+                  {selectedEdge
+                    ? "Connection settings"
+                    : selectedService
+                      ? selectedService.name
+                      : "Resource settings"}
+                </h2>
               </div>
               <button
                 className="mobile-close"
@@ -2218,14 +2560,82 @@ export default function Home() {
               </button>
             </div>
 
-            {selectedNode && selectedService ? (
+            {selectedEdge && selectedEdgeFrom && selectedEdgeTo ? (
+              <div className="connection-inspector">
+                <div className="connection-inspector-path" aria-label="Selected connection endpoints">
+                  {[selectedEdgeFrom, selectedEdgeTo].map((node, index) => {
+                    const service = serviceById(provider, node.serviceId);
+                    return (
+                      <span key={node.id}>
+                        <i
+                          className="connection-endpoint-icon"
+                          style={{ "--service-accent": service?.accent ?? provider.accent } as CSSProperties}
+                        >
+                          {service && <ServiceArtwork service={service} className="node-glyph" />}
+                        </i>
+                        <b>{node.values.name}</b>
+                        <small>{service?.name}</small>
+                        {index === 0 && <em aria-hidden="true">→</em>}
+                      </span>
+                    );
+                  })}
+                </div>
+                <div className="connection-safe-note" role="note">
+                  <strong>Delete only this line</strong>
+                  <p>The two services and every other connection will stay on the canvas.</p>
+                </div>
+                <button
+                  className="danger-button connection-delete-primary"
+                  onClick={() => deleteConnection(selectedEdge.id)}
+                >
+                  Delete selected connection
+                </button>
+                <p className="connection-keyboard-hint">
+                  Tip: select any line and press <kbd>Delete</kbd> or <kbd>Backspace</kbd>.
+                </p>
+              </div>
+            ) : selectedNode && selectedService ? (
               <>
+                {aiGuideNodeIds.length > 0 && aiGuideNodeId === selectedNode.id && (
+                  <div className="ai-config-guide" role="status" aria-live="polite">
+                    <span className="ai-guide-kicker"><i /> AI configuration review</span>
+                    <strong>Resource {aiGuideIndex + 1} of {aiGuideNodeIds.length}</strong>
+                    <p>Review the generated name and service values below before moving forward.</p>
+                    <div className="ai-guide-progress" aria-hidden="true">
+                      <i style={{ width: `${((aiGuideIndex + 1) / aiGuideNodeIds.length) * 100}%` }} />
+                    </div>
+                    <div className="ai-guide-actions">
+                      <button
+                        onClick={() => selectAiGuideStep(aiGuideIndex - 1)}
+                        disabled={aiGuideIndex === 0}
+                      >
+                        Previous
+                      </button>
+                      {aiGuideIndex < aiGuideNodeIds.length - 1 ? (
+                        <button className="primary-small" onClick={() => selectAiGuideStep(aiGuideIndex + 1)}>
+                          Save & next
+                        </button>
+                      ) : (
+                        <button
+                          className="primary-small"
+                          onClick={() => {
+                            setAiGuideNodeIds([]);
+                            setAiGuideIndex(0);
+                            notify("AI architecture configuration review complete");
+                          }}
+                        >
+                          Finish review
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="selected-resource-card">
                   <span
                     className="selected-resource-icon"
                     style={{ "--service-accent": selectedService.accent } as CSSProperties}
                   >
-                    <ServiceGlyph role={selectedService.role} className="node-glyph" />
+                    <ServiceArtwork service={selectedService} className="node-glyph" />
                   </span>
                   <span>
                     <strong>{selectedNode.values.name}</strong>
@@ -2239,12 +2649,24 @@ export default function Home() {
                       href={selectedService.docs}
                       target="_blank"
                       rel="noreferrer noopener"
-                      title="Open the Terraform registry documentation"
+                      title={`Open ${provider.shortName} documentation`}
                     >
                       docs ↗
                     </a>
                   )}
                 </div>
+
+                {selectedService.iacSupport === "diagram" && (
+                  <div className="diagram-only-notice" role="note">
+                    <span aria-hidden="true"><i /></span>
+                    <p>
+                      <strong>Architecture component</strong>
+                      This official service is available for diagrams and exports. Verified Terraform
+                      and Pulumi generation has not been modeled yet, so it is intentionally omitted
+                      from deployment files.
+                    </p>
+                  </div>
+                )}
 
                 <div className="form-section">
                   <div className="form-section-title">
@@ -2258,10 +2680,11 @@ export default function Home() {
                       onChange={(event) => updateSelectedValue("name", event.target.value)}
                     />
                     <small>
-                      Terraform address:{" "}
-                      <code>
-                        {selectedService.tfType}.{safeName(selectedNode.values.name)}
-                      </code>
+                      {selectedService.iacSupport === "diagram" ? (
+                        <>Diagram identifier: <code>{safeName(selectedNode.values.name)}</code></>
+                      ) : (
+                        <>Terraform address: <code>{selectedService.tfType}.{safeName(selectedNode.values.name)}</code></>
+                      )}
                     </small>
                   </label>
                 </div>
@@ -2304,12 +2727,7 @@ export default function Home() {
                               <small>{otherService?.name}</small>
                             </span>
                             <button
-                              onClick={() =>
-                                commit((current) => ({
-                                  ...current,
-                                  edges: current.edges.filter((item) => item.id !== edge.id),
-                                }))
-                              }
+                              onClick={() => deleteConnection(edge.id)}
                               aria-label={`Remove the connection to ${other?.values.name ?? "resource"}`}
                             >
                               ×
@@ -2333,7 +2751,7 @@ export default function Home() {
                     Remove resource
                   </button>
                   <button className="primary-small" onClick={showGeneratedCode}>
-                    View code
+                    {selectedService.iacSupport === "diagram" ? "Review generation" : "View code"}
                   </button>
                 </div>
               </>
@@ -2374,10 +2792,10 @@ export default function Home() {
               InfraCanvas
             </div>
             <span className="step-chip">STEP 1 OF 3</span>
-            <h1 id="provider-title">Where are you building?</h1>
+            <h1 id="provider-title">Design cloud architecture. Generate real IaC.</h1>
             <p>
-              Choose a cloud provider. We load its native services, real property options, and the
-              matching Terraform provider automatically.
+              Choose AWS, Azure, Google Cloud, or Oracle Cloud. Prompt with AI or drag native
+              services, configure real values, and generate Terraform or Pulumi.
             </p>
             <div className="provider-grid">
               {providers.map((item) => (
@@ -2557,10 +2975,13 @@ export default function Home() {
               <span className="step-chip">STEP 2 OF 3</span>
               <h2 id="example-start-title">Your {provider.shortName} canvas is ready</h2>
               <p>
-                Start from the center of a blank canvas, or load the secure production example
-                with {SAMPLE_ARCHITECTURES[provider.id].length} configured resources.
+                Describe what you need and get an editable architecture draft, start blank, or load
+                the secure production example with {SAMPLE_ARCHITECTURES[provider.id].length} configured resources.
               </p>
-              <div className="confirm-actions two-actions">
+              <div className="confirm-actions three-actions">
+                <button className="ai-start-button" onClick={showAiArchitect}>
+                  Design with AI
+                </button>
                 <button className="primary-small" onClick={() => loadSample(provider.id)}>
                   Load example architecture
                 </button>
@@ -2571,6 +2992,181 @@ export default function Home() {
             </section>
           </div>
         )}
+
+      {aiArchitectOpen && (
+        <div
+          className="modal-backdrop ai-architect-backdrop"
+          role="presentation"
+          onPointerDown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            setAiArchitectOpen(false);
+            setAiPlan(null);
+            setAiError("");
+          }}
+        >
+          <section
+            ref={aiDialogRef}
+            className="ai-architect-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ai-architect-title"
+            tabIndex={-1}
+            style={{ "--provider-accent": provider.accent } as CSSProperties}
+          >
+            <header className="ai-architect-header">
+              <span className="ai-architect-symbol" aria-hidden="true"><i /><i /><i /></span>
+              <span>
+                <small>INFRA CANVAS AI</small>
+                <strong>AI Architect</strong>
+              </span>
+              <span className="ai-provider-pill">
+                <ProviderMark provider={provider.id} className="ai-provider-mark" />
+                {provider.shortName}
+              </span>
+              <button
+                className="ai-modal-close"
+                onClick={() => {
+                  setAiArchitectOpen(false);
+                  setAiPlan(null);
+                  setAiError("");
+                }}
+                aria-label="Close AI Architect"
+              >
+                ×
+              </button>
+            </header>
+
+            {!aiPlan ? (
+              <div className="ai-prompt-layout">
+                <div className="ai-prompt-copy">
+                  <span className="ai-mode-pill"><i /> Prompt to architecture</span>
+                  <h2 id="ai-architect-title">Describe it. InfraCanvas will map it.</h2>
+                  <p>
+                    Explain the workload, traffic, availability, data, and security needs. You will
+                    review the proposed services before anything reaches the canvas.
+                  </p>
+                  <div className="ai-trust-note" role="note">
+                    <i aria-hidden="true" />
+                    <span>
+                      <strong>Architecture draft only</strong>
+                      No cloud credentials are requested and nothing is deployed. Review every value before generating IaC.
+                    </span>
+                  </div>
+                </div>
+                <form
+                  className="ai-prompt-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void requestAiArchitecture();
+                  }}
+                >
+                  <label htmlFor="ai-architecture-prompt">What are you building?</label>
+                  <textarea
+                    id="ai-architecture-prompt"
+                    value={aiPrompt}
+                    onChange={(event) => setAiPrompt(event.target.value.slice(0, 4000))}
+                    placeholder={`Example: A secure, highly available ${provider.shortName} application with private compute, PostgreSQL, Redis, a queue, WAF, and monitoring.`}
+                    rows={7}
+                    autoFocus
+                  />
+                  <span className="ai-character-count">{aiPrompt.length} / 4,000</span>
+                  <div className="ai-example-list">
+                    <small>TRY AN EXAMPLE</small>
+                    {AI_ARCHITECT_EXAMPLES[provider.id].map((example) => (
+                      <button key={example} type="button" onClick={() => setAiPrompt(example)}>
+                        {example}
+                      </button>
+                    ))}
+                  </div>
+                  {aiError && <p className="ai-planner-message" role="alert">{aiError}</p>}
+                  <div className="ai-prompt-actions">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => setAiArchitectOpen(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="ai-generate-button"
+                      disabled={aiPlanning || aiPrompt.trim().length < 12}
+                    >
+                      {aiPlanning ? <><i className="ai-spinner" /> Planning architecture…</> : <>Generate architecture <span>→</span></>}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div className="ai-plan-review">
+                <div className="ai-plan-summary">
+                  <span className={`ai-source-pill ${aiPlan.source}`}><i />{aiPlan.source === "ai" ? "AI generated" : "Local catalog draft"}</span>
+                  <h2 id="ai-architect-title">{aiPlan.title}</h2>
+                  <p>{aiPlan.summary}</p>
+                  <div className="ai-plan-metrics">
+                    <span><strong>{aiPlan.nodes.length}</strong> editable services</span>
+                    <span><strong>{aiPlan.edges.length}</strong> connections</span>
+                    <span><strong>0</strong> deployments</span>
+                  </div>
+                  {aiPlan.assumptions.length > 0 && (
+                    <div className="ai-assumptions">
+                      <strong>Review assumptions</strong>
+                      <ul>{aiPlan.assumptions.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </div>
+                  )}
+                  {nodes.length > 0 && (
+                    <p className="ai-replace-warning" role="note">
+                      Building this draft replaces the current canvas. Undo will restore it.
+                    </p>
+                  )}
+                </div>
+                <div className="ai-service-review">
+                  <header>
+                    <span>
+                      <small>PROPOSED ARCHITECTURE</small>
+                      <strong>Catalog-backed services</strong>
+                    </span>
+                    <b>{provider.shortName}</b>
+                  </header>
+                  <ol>
+                    {aiPlan.nodes.map((planNode, index) => {
+                      const service = serviceById(provider, planNode.serviceId);
+                      if (!service) return null;
+                      return (
+                        <li key={`${planNode.serviceId}-${index}`} style={{ "--service-accent": service.accent } as CSSProperties}>
+                          <span className="ai-review-service-icon"><ServiceArtwork service={service} className="node-glyph" /></span>
+                          <span>
+                            <strong>{planNode.name}</strong>
+                            <small>{service.name} · {service.category}</small>
+                            <p>{planNode.reason}</p>
+                          </span>
+                          <b>{Object.keys(planNode.values).length} values</b>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+                {aiError && <p className="ai-planner-message plan-message" role="alert">{aiError}</p>}
+                <footer className="ai-plan-actions">
+                  <button
+                    className="ghost-button"
+                    onClick={() => {
+                      setAiPlan(null);
+                      setAiError("");
+                    }}
+                  >
+                    ← Edit prompt
+                  </button>
+                  <span>Next: review every service configuration</span>
+                  <button className="ai-generate-button" onClick={applyAiArchitecture}>
+                    Build & configure <span>→</span>
+                  </button>
+                </footer>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
 
       {shortcutsOpen && (
         <div
@@ -2594,7 +3190,7 @@ export default function Home() {
                 ["Ctrl / ⌘ + D", "Duplicate selection"],
                 ["Ctrl / ⌘ + A", "Select all"],
                 ["Ctrl / ⌘ + S", "Save project"],
-                ["Delete / Backspace", "Remove selection"],
+                ["Delete / Backspace", "Remove selected resource or connection"],
                 ["Shift + click", "Add to selection"],
                 ["Drag on canvas", "Marquee select"],
                 ["Ctrl / ⌘ + scroll", "Zoom"],
@@ -2705,11 +3301,23 @@ export default function Home() {
               </span>
               <span>{generated.resourceCount} resources</span>
               <span>{edges.length} wired references</span>
+              {diagramOnlyNodeCount > 0 && <span>{diagramOnlyNodeCount} diagram-only nodes excluded</span>}
               <span className={errorCount > 0 ? "code-blocked" : "code-ready"}>
                 <i />
                 {errorCount > 0 ? `${errorCount} blocking issues` : "Ready for review"}
               </span>
             </div>
+
+            {diagramOnlyNodeCount > 0 && (
+              <div className="generation-coverage-note" role="note">
+                <span aria-hidden="true"><i /></span>
+                <p>
+                  <strong>Verified generation boundary</strong>
+                  {diagramOnlyNodeCount} official architecture {diagramOnlyNodeCount === 1 ? "service is" : "services are"}
+                  {" "}preserved in the diagram but omitted from deployment files until its required provider configuration is modeled.
+                </p>
+              </div>
+            )}
 
             <div className="code-workspace">
               <nav className="file-tree" aria-label="Generated files">

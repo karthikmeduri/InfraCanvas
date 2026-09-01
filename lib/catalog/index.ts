@@ -1,8 +1,105 @@
 import type { ProviderDefinition, ProviderId, ServiceDefinition } from "../types";
-import { aws } from "./aws";
-import { azure } from "./azure";
-import { gcp } from "./gcp";
+import { aws as awsBase } from "./aws";
+import { azure as azureBase } from "./azure";
+import { gcp as gcpBase } from "./gcp";
 import { oci } from "./oci";
+import { expandProviderCatalog } from "./expanded";
+import { awsMajorServices } from "./major/aws";
+import { azureMajorServices } from "./major/azure";
+import { gcpMajorServices } from "./major/gcp";
+import {
+  AWS_SERVICE_CATALOG,
+  AZURE_SERVICE_CATALOG,
+  GCP_SERVICE_CATALOG,
+} from "./generated-service-manifest";
+
+const withMajorServices = (
+  provider: ProviderDefinition,
+  majorServices: ServiceDefinition[],
+): ProviderDefinition => ({
+  ...provider,
+  services: [...provider.services, ...majorServices],
+});
+
+const awsCurated = withMajorServices(awsBase, awsMajorServices);
+const azureCurated = withMajorServices(azureBase, azureMajorServices);
+const gcpCurated = withMajorServices(gcpBase, gcpMajorServices);
+
+const aws = expandProviderCatalog(awsCurated, AWS_SERVICE_CATALOG, {
+  vpc: "/cloud-icons/aws/amazon-virtual-private-cloud.svg",
+  subnet: "/cloud-icons/aws/amazon-virtual-private-cloud.svg",
+  internet_gateway: "/cloud-icons/aws/amazon-virtual-private-cloud.svg",
+  nat_gateway: "/cloud-icons/aws/amazon-virtual-private-cloud.svg",
+  alb: "/cloud-icons/aws/elastic-load-balancing.svg",
+  target_group: "/cloud-icons/aws/elastic-load-balancing.svg",
+  cloudfront: "/cloud-icons/aws/amazon-cloudfront.svg",
+  route53: "/cloud-icons/aws/amazon-route-53.svg",
+  api_gateway: "/cloud-icons/aws/amazon-api-gateway.svg",
+  ec2: "/cloud-icons/aws/amazon-ec2.svg",
+  asg: "/cloud-icons/aws/amazon-ec2-auto-scaling.svg",
+  lambda: "/cloud-icons/aws/aws-lambda.svg",
+  ecs: "/cloud-icons/aws/amazon-elastic-container-service.svg",
+  eks: "/cloud-icons/aws/amazon-elastic-kubernetes-service.svg",
+  ecr: "/cloud-icons/aws/amazon-elastic-container-registry.svg",
+  rds: "/cloud-icons/aws/amazon-rds.svg",
+  dynamodb: "/cloud-icons/aws/amazon-dynamodb.svg",
+  elasticache: "/cloud-icons/aws/amazon-elasticache.svg",
+  s3: "/cloud-icons/aws/amazon-simple-storage-service.svg",
+  efs: "/cloud-icons/aws/amazon-efs.svg",
+  security_group: "/cloud-icons/aws/amazon-virtual-private-cloud.svg",
+  waf: "/cloud-icons/aws/aws-waf.svg",
+  kms: "/cloud-icons/aws/aws-key-management-service.svg",
+  secrets_manager: "/cloud-icons/aws/aws-secrets-manager.svg",
+  iam_role: "/cloud-icons/aws/aws-identity-and-access-management.svg",
+  sqs: "/cloud-icons/aws/amazon-simple-queue-service.svg",
+  sns: "/cloud-icons/aws/amazon-simple-notification-service.svg",
+  cloudwatch_alarm: "/cloud-icons/aws/amazon-cloudwatch.svg",
+});
+
+const azure = expandProviderCatalog(azureCurated, AZURE_SERVICE_CATALOG, {
+  vnet: "/cloud-icons/azure/virtual-networks.svg",
+  subnet: "/cloud-icons/azure/subnet.svg",
+  public_ip: "/cloud-icons/azure/public-ip-addresses.svg",
+  app_gateway: "/cloud-icons/azure/application-gateways.svg",
+  front_door: "/cloud-icons/azure/front-door-and-cdn-profiles.svg",
+  vm: "/cloud-icons/azure/virtual-machine.svg",
+  app_service: "/cloud-icons/azure/app-services.svg",
+  functions: "/cloud-icons/azure/function-apps.svg",
+  aks: "/cloud-icons/azure/kubernetes-services.svg",
+  acr: "/cloud-icons/azure/container-registries.svg",
+  postgres: "/cloud-icons/azure/azure-database-postgresql-server.svg",
+  sql: "/cloud-icons/azure/sql-database.svg",
+  cosmos: "/cloud-icons/azure/azure-cosmos-db.svg",
+  redis: "/cloud-icons/azure/cache-redis.svg",
+  storage_account: "/cloud-icons/azure/storage-accounts.svg",
+  nsg: "/cloud-icons/azure/network-security-groups.svg",
+  key_vault: "/cloud-icons/azure/key-vaults.svg",
+  servicebus: "/cloud-icons/azure/azure-service-bus.svg",
+  log_analytics: "/cloud-icons/azure/log-analytics-workspaces.svg",
+});
+
+const gcp = expandProviderCatalog(gcpCurated, GCP_SERVICE_CATALOG, {
+  vpc: "/cloud-icons/gcp/networking.svg",
+  subnet: "/cloud-icons/gcp/networking.svg",
+  cloud_nat: "/cloud-icons/gcp/networking.svg",
+  load_balancer: "/cloud-icons/gcp/networking.svg",
+  dns_record: "/cloud-icons/gcp/networking.svg",
+  compute: "/cloud-icons/gcp/compute.svg",
+  cloud_run: "/cloud-icons/gcp/serverless-computing.svg",
+  cloud_function: "/cloud-icons/gcp/serverless-computing.svg",
+  gke: "/cloud-icons/gcp/containers.svg",
+  artifact_registry: "/cloud-icons/gcp/devops.svg",
+  cloud_sql: "/cloud-icons/gcp/databases.svg",
+  firestore: "/cloud-icons/gcp/databases.svg",
+  memorystore: "/cloud-icons/gcp/databases.svg",
+  bigquery: "/cloud-icons/gcp/data-analytics.svg",
+  storage: "/cloud-icons/gcp/storage.svg",
+  firewall: "/cloud-icons/gcp/security-identity.svg",
+  secret_manager: "/cloud-icons/gcp/security-identity.svg",
+  service_account: "/cloud-icons/gcp/security-identity.svg",
+  pubsub: "/cloud-icons/gcp/data-analytics.svg",
+  monitoring_alert: "/cloud-icons/gcp/observability.svg",
+});
 
 export const providers: ProviderDefinition[] = [aws, azure, gcp, oci];
 
@@ -25,6 +122,26 @@ export const CATEGORY_ORDER = [
   "Security",
   "Integration",
   "Observability",
+  "Analytics",
+  "Artificial Intelligence",
+  "AI Machine Learning",
+  "Agents",
+  "Business Intelligence",
+  "Application Integration",
+  "App Services",
+  "Developer Tools",
+  "DevOps",
+  "Hybrid Multicloud",
+  "Integration Services",
+  "Management Tools",
+  "Maps Geospatial",
+  "Migration Modernization",
+  "Migration",
+  "Operations",
+  "Security Identity",
+  "Serverless Computing",
+  "Web Mobile",
+  "Web3",
 ];
 
 export type SampleArchitectureNode = {
@@ -73,6 +190,8 @@ export const SAMPLE_ARCHITECTURES: Record<ProviderId, SampleArchitectureNode[]> 
     { serviceId: "sqs", x: 2496, y: 936, values: { name: "work-queue", fifo: "false", visibility_timeout: "60" } },
     { serviceId: "sns", x: 2736, y: 936, values: { name: "operations-topic", fifo: "false" } },
     { serviceId: "cloudwatch_alarm", x: 2736, y: 1176, values: { name: "platform-health", metric: "CPUUtilization", threshold: "75", evaluation_periods: "2" } },
+    { serviceId: "athena", x: 2496, y: 1416, values: { name: "security-analytics", state: "ENABLED", enforce_configuration: "true" } },
+    { serviceId: "bedrock", x: 2736, y: 1416, values: { name: "operations-agent", foundation_model: "amazon.nova-pro-v1:0", idle_ttl: "600", prepare_agent: "true" } },
   ],
   azure: [
     { serviceId: "front_door", x: 48, y: 96, values: { name: "global-edge", sku: "Premium_AzureFrontDoor" } },
@@ -98,6 +217,8 @@ export const SAMPLE_ARCHITECTURES: Record<ProviderId, SampleArchitectureNode[]> 
     { serviceId: "key_vault", x: 2256, y: 576, values: { name: "platform-vault", sku: "premium", retention_days: "90" } },
     { serviceId: "servicebus", x: 2496, y: 96, values: { name: "application-events", sku: "Premium", max_delivery_count: "10" } },
     { serviceId: "log_analytics", x: 2736, y: 336, values: { name: "central-observability", sku: "PerGB2018", retention_days: "90" } },
+    { serviceId: "data_factory", x: 2496, y: 576, values: { name: "analytics-orchestration", managed_vnet: "true", public_network: "false" } },
+    { serviceId: "azure_openai", x: 2736, y: 576, values: { name: "application-ai", sku: "S0", custom_subdomain: "infracanvas-production-ai", public_network: "false" } },
   ],
   gcp: [
     { serviceId: "dns_record", x: 48, y: 96, values: { name: "public-dns", record_name: "app.example.com.", type: "A" } },
@@ -124,6 +245,7 @@ export const SAMPLE_ARCHITECTURES: Record<ProviderId, SampleArchitectureNode[]> 
     { serviceId: "service_account", x: 2496, y: 576, values: { name: "workload-identity", role: "roles/cloudsql.client" } },
     { serviceId: "pubsub", x: 2496, y: 96, values: { name: "application-events", retention_days: "14", ack_deadline: "60" } },
     { serviceId: "monitoring_alert", x: 2736, y: 336, values: { name: "platform-health", threshold: "0.75", duration: "300s" } },
+    { serviceId: "vertex_ai_endpoint", x: 2736, y: 576, values: { name: "production-inference", endpoint_id: "1000000001", description: "Production inference endpoint", dedicated_endpoint: "false" } },
   ],
   oci: [
     { serviceId: "internet_gateway", x: 48, y: 96, values: { name: "public-internet" } },
@@ -168,6 +290,7 @@ export const SAMPLE_EDGES: Record<ProviderId, [number, number][]> = {
     [27, 28], [29, 18], [29, 19], [14, 29],
     [30, 28], [30, 31], [31, 25], [32, 15], [32, 18],
     [33, 34], [34, 35],
+    [27, 36], [29, 37], [20, 37],
   ],
   azure: [
     [0, 5], [1, 5], [2, 3], [2, 6], [2, 13], [3, 5], [4, 5],
@@ -178,6 +301,7 @@ export const SAMPLE_EDGES: Record<ProviderId, [number, number][]> = {
     [12, 19], [12, 20], [13, 15], [13, 16], [13, 17], [13, 18],
     [14, 15], [14, 16], [14, 17], [14, 18], [21, 12],
     [15, 22], [16, 22], [17, 22], [18, 22], [21, 22],
+    [19, 23], [22, 23], [20, 24], [22, 24],
   ],
   gcp: [
     [0, 4], [1, 2], [1, 6], [1, 13], [2, 4], [2, 5], [3, 4],
@@ -187,6 +311,7 @@ export const SAMPLE_EDGES: Record<ProviderId, [number, number][]> = {
     [10, 18], [10, 20], [11, 15], [11, 16], [11, 20], [12, 19], [12, 20],
     [13, 15], [13, 17], [14, 15], [14, 17], [21, 9], [21, 10], [21, 11],
     [22, 11], [22, 12], [15, 23], [17, 23], [18, 23], [22, 23],
+    [19, 24], [21, 24], [23, 24],
   ],
   oci: [
     [0, 2], [1, 2], [1, 7], [1, 13], [2, 5], [3, 5], [4, 5],

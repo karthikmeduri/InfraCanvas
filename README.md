@@ -2,7 +2,7 @@
 
 # ◢ InfraCanvas
 
-### Draw your cloud architecture. Generate deployable Terraform or Pulumi.
+### AI visual cloud architecture builder for Terraform and Pulumi
 
 [![InfraCanvas — draw cloud architecture and generate Terraform or Pulumi](public/og.png)](https://infracanvas-builder.karthik-m.chatgpt.site)
 
@@ -14,12 +14,30 @@
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-FF8A00?style=flat-square&logo=cloudflare)](https://workers.cloudflare.com/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-C7F36B?style=flat-square)](LICENSE)
 
-**A visual infrastructure builder for AWS, Azure, Google Cloud, and Oracle Cloud.**
-**84 services across 4 clouds. Import live state, edit the architecture, then generate Terraform or Pulumi from the same connected diagram.**
+**InfraCanvas by Karthik Meduri is an open-source, bidirectional infrastructure visual builder for AWS, Azure, Google Cloud, and Oracle Cloud.**
+**Prompt or draw an architecture, generate Terraform and Pulumi, import live state with StateLens, and visualize configuration drift with TFwhy.**
+
+**1,188 official cloud services · 119 IaC-ready components · 4 clouds · one editable architecture graph.**
 
 ### [Launch the live InfraCanvas builder →](https://infracanvas-builder.karthik-m.chatgpt.site)
 
 </div>
+
+## Why this project is different
+
+Most infrastructure diagram tools travel in one direction. InfraCanvas connects the entire
+infrastructure lifecycle around one editable graph:
+
+| Start with | InfraCanvas produces |
+| --- | --- |
+| A natural-language application brief | An AI-proposed, catalog-backed architecture with guided configuration |
+| A visual AWS, Azure, GCP, or OCI diagram | Complete Terraform modules and Pulumi TypeScript projects |
+| Terraform or Pulumi state | An editable architecture diagram through StateLens |
+| A TFwhy drift report | Drift findings mapped back to the affected canvas resources |
+
+That makes InfraCanvas more than a Terraform visualizer: it is a prompt-to-diagram,
+diagram-to-IaC, state-to-diagram, and drift-to-canvas workflow in one open-source application.
+This repository is created by **Karthik Meduri**, **Sai Sravan Meduri**, and **Srikar Podicheti**.
 
 ## See InfraCanvas in action
 
@@ -105,6 +123,26 @@ flowchart LR
    provider schema, not free text.
 5. **Generate.** Choose Terraform or Pulumi. One click produces either the validated
    multi-file Terraform module or a complete Pulumi TypeScript deployment project.
+
+## AI Architect — prompt to editable infrastructure
+
+Choose a cloud, open **AI Architect**, and describe the workload in plain language. InfraCanvas
+proposes a catalog-backed architecture, shows the assumptions and every selected service for
+review, then places the connected resources on the canvas. A guided inspector walks through each
+service so names, sizes, regions, CIDRs, engines, and security values can be reviewed before IaC is
+generated. AI Architect creates a draft only: it never deploys resources or requests cloud
+credentials.
+
+The optional hosted planner uses the OpenAI Responses API from a server route. Keep its key on the
+server—never in a `NEXT_PUBLIC_` variable:
+
+```bash
+cp .env.example .env.local
+# Add OPENAI_API_KEY to .env.local, then restart npm run dev
+```
+
+Without an API key, the same workflow remains testable with a clearly labeled, deterministic local
+catalog draft. The UI never presents that fallback as an AI model response.
 
 ## StateLens — state to architecture
 

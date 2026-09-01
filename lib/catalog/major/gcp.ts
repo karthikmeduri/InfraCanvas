@@ -1,0 +1,308 @@
+import {
+  attr,
+  block,
+  dnsName,
+  flag,
+  list,
+  num,
+  raw,
+  resource,
+  str,
+} from "../../hcl";
+import type { ServiceDefinition } from "../../types";
+import { combo, defineService, number, select, text, toggle } from "../helpers";
+
+export const gcpMajorServices: ServiceDefinition[] = [
+  defineService({
+    id: "app_engine",
+    name: "App Engine",
+    short: "GAE",
+    category: "Compute",
+    role: "serverless",
+    tfType: "google_app_engine_application",
+    description: "Managed application platform for web services and APIs",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/app_engine_application",
+    fields: [
+      combo("location_id", "Application location", ["us-central", "europe-west", "asia-northeast1"]),
+      select("database_type", "Default database", ["CLOUD_FIRESTORE", "CLOUD_DATASTORE_COMPATIBILITY"]),
+      toggle("serving_status", "Serve traffic", true),
+    ],
+    emit: (c) => [resource("google_app_engine_application", c.name, [
+      attr("project", raw("var.project_id")),
+      attr("location_id", str(c.v.location_id || "us-central")),
+      attr("database_type", str(c.v.database_type || "CLOUD_FIRESTORE")),
+      attr("serving_status", str(c.v.serving_status === "false" ? "USER_DISABLED" : "SERVING")),
+    ])],
+  }),
+  defineService({
+    id: "cloud_scheduler",
+    name: "Cloud Scheduler",
+    short: "SCH",
+    category: "Integration",
+    role: "serverless",
+    tfType: "google_cloud_scheduler_job",
+    description: "Managed cron scheduling for HTTP workloads",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloud_scheduler_job",
+    fields: [
+      text("schedule", "Cron schedule", "*/15 * * * *"),
+      combo("time_zone", "Time zone", ["Etc/UTC", "America/Los_Angeles", "America/New_York", "Europe/London", "Asia/Kolkata"]),
+      select("http_method", "HTTP method", ["GET", "POST", "PUT", "PATCH"]),
+      text("uri", "Target URI", "https://example.com/health"),
+      number("retry_count", "Retry count", "3"),
+      toggle("paused", "Paused", false),
+    ],
+    emit: (c) => [resource("google_cloud_scheduler_job", c.name, [
+      attr("name", str(dnsName(c.display, "scheduled-job", 500))),
+      attr("region", raw("var.region")),
+      attr("description", str(`Generated schedule for ${c.display}`)),
+      attr("schedule", str(c.v.schedule || "*/15 * * * *")),
+      attr("time_zone", str(c.v.time_zone || "Etc/UTC")),
+      attr("paused", flag(c.v.paused, false)),
+      block("retry_config", [], [attr("retry_count", num(c.v.retry_count, 3))]),
+      block("http_target", [], [
+        attr("http_method", str(c.v.http_method || "GET")),
+        attr("uri", str(c.v.uri || "https://example.com/health")),
+      ]),
+    ])],
+  }),
+  defineService({
+    id: "cloud_tasks",
+    name: "Cloud Tasks",
+    short: "TASK",
+    category: "Integration",
+    role: "queue",
+    tfType: "google_cloud_tasks_queue",
+    description: "Managed asynchronous task queue with rate controls",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloud_tasks_queue",
+    fields: [
+      number("max_dispatches", "Dispatches per second", "10"),
+      number("max_concurrent", "Concurrent dispatches", "20"),
+      number("max_attempts", "Maximum attempts", "5"),
+      text("max_retry_duration", "Maximum retry duration", "3600s"),
+    ],
+    emit: (c) => [resource("google_cloud_tasks_queue", c.name, [
+      attr("name", str(dnsName(c.display, "task-queue", 100))),
+      attr("location", raw("var.region")),
+      block("rate_limits", [], [
+        attr("max_dispatches_per_second", num(c.v.max_dispatches, 10)),
+        attr("max_concurrent_dispatches", num(c.v.max_concurrent, 20)),
+      ]),
+      block("retry_config", [], [
+        attr("max_attempts", num(c.v.max_attempts, 5)),
+        attr("max_retry_duration", str(c.v.max_retry_duration || "3600s")),
+      ]),
+    ])],
+  }),
+  defineService({
+    id: "spanner",
+    name: "Spanner",
+    short: "SPN",
+    category: "Database",
+    role: "database",
+    tfType: "google_spanner_instance",
+    description: "Globally consistent relational database",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/spanner_instance",
+    fields: [
+      combo("config", "Instance configuration", ["regional-us-central1", "regional-us-east1", "regional-europe-west1", "nam-eur-asia1"]),
+      number("nodes", "Processing nodes", "1"),
+      text("database_name", "Database name", "application"),
+      select("dialect", "SQL dialect", ["GOOGLE_STANDARD_SQL", "POSTGRESQL"]),
+      toggle("deletion_protection", "Database deletion protection", true),
+    ],
+    emit: (c) => {
+      const database = `${c.name}_database`;
+      c.output({ name: `${c.name}_database_id`, value: raw(`google_spanner_database.${database}.id`), description: `Database id for ${c.display}` });
+      return [
+        resource("google_spanner_instance", c.name, [
+          attr("name", str(dnsName(c.display, "spanner", 30))),
+          attr("config", str(c.v.config || "regional-us-central1")),
+          attr("display_name", str(c.display)),
+          attr("num_nodes", num(c.v.nodes, 1)),
+          attr("labels", c.tags),
+        ]),
+        resource("google_spanner_database", database, [
+          attr("instance", raw(`google_spanner_instance.${c.name}.name`)),
+          attr("name", str(dnsName(c.v.database_name || "application", "application", 30))),
+          attr("database_dialect", str(c.v.dialect || "GOOGLE_STANDARD_SQL")),
+          attr("deletion_protection", flag(c.v.deletion_protection, true)),
+        ]),
+      ];
+    },
+  }),
+  defineService({
+    id: "bigtable",
+    name: "Bigtable",
+    short: "BT",
+    category: "Database",
+    role: "database",
+    tfType: "google_bigtable_instance",
+    description: "Low-latency wide-column database for massive scale",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/bigtable_instance",
+    fields: [
+      text("cluster_id", "Cluster id", "primary"),
+      combo("zone", "Cluster zone", ["us-central1-a", "us-central1-b", "us-east1-b", "europe-west1-b"]),
+      number("nodes", "Cluster nodes", "3"),
+      select("storage_type", "Storage type", ["SSD", "HDD"]),
+      toggle("deletion_protection", "Deletion protection", true),
+    ],
+    emit: (c) => [resource("google_bigtable_instance", c.name, [
+      attr("name", str(dnsName(c.display, "bigtable", 30))),
+      attr("display_name", str(c.display)),
+      attr("deletion_protection", flag(c.v.deletion_protection, true)),
+      block("cluster", [], [
+        attr("cluster_id", str(dnsName(c.v.cluster_id || "primary", "primary", 30))),
+        attr("zone", str(c.v.zone || "us-central1-a")),
+        attr("num_nodes", num(c.v.nodes, 3)),
+        attr("storage_type", str(c.v.storage_type || "SSD")),
+      ]),
+      attr("labels", c.tags),
+    ])],
+  }),
+  defineService({
+    id: "cloud_build",
+    name: "Cloud Build",
+    short: "CB",
+    category: "Compute",
+    role: "compute",
+    tfType: "google_cloudbuild_trigger",
+    description: "Automated build and delivery trigger",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloudbuild_trigger",
+    fields: [
+      text("github_owner", "GitHub owner", "your-organization"),
+      text("github_repository", "GitHub repository", "your-repository"),
+      text("branch_pattern", "Branch pattern", "^main$"),
+      text("build_file", "Build configuration", "cloudbuild.yaml"),
+      toggle("disabled", "Disable trigger", false),
+    ],
+    emit: (c) => [resource("google_cloudbuild_trigger", c.name, [
+      attr("name", str(dnsName(c.display, "build-trigger", 64))),
+      attr("location", raw("var.region")),
+      attr("description", str(`Build trigger for ${c.display}`)),
+      attr("disabled", flag(c.v.disabled, false)),
+      attr("filename", str(c.v.build_file || "cloudbuild.yaml")),
+      block("github", [], [
+        attr("owner", str(c.v.github_owner || "your-organization")),
+        attr("name", str(c.v.github_repository || "your-repository")),
+        block("push", [], [attr("branch", str(c.v.branch_pattern || "^main$"))]),
+      ]),
+    ])],
+  }),
+  defineService({
+    id: "eventarc",
+    name: "Eventarc",
+    short: "EVT",
+    category: "Integration",
+    role: "topic",
+    tfType: "google_eventarc_trigger",
+    description: "Event-driven routing to Cloud Run services",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/eventarc_trigger",
+    fields: [
+      combo("event_type", "Event type", ["google.cloud.pubsub.topic.v1.messagePublished", "google.cloud.storage.object.v1.finalized", "google.cloud.audit.log.v1.written"]),
+      text("destination_service", "Cloud Run service name", "application-service"),
+      text("transport_topic", "Pub/Sub transport topic id", "", "Optional full Pub/Sub topic id."),
+      number("max_attempts", "Maximum delivery attempts", "5"),
+    ],
+    emit: (c) => [resource("google_eventarc_trigger", c.name, [
+      attr("name", str(dnsName(c.display, "event-trigger", 63))),
+      attr("location", raw("var.region")),
+      block("matching_criteria", [], [attr("attribute", str("type")), attr("value", str(c.v.event_type || "google.cloud.pubsub.topic.v1.messagePublished"))]),
+      block("destination", [], [block("cloud_run_service", [], [attr("service", str(c.v.destination_service || "application-service")), attr("region", raw("var.region"))])]),
+      ...(c.v.transport_topic ? [block("transport", [], [block("pubsub", [], [attr("topic", str(c.v.transport_topic))])])] : []),
+      block("retry_policy", [], [attr("max_attempts", num(c.v.max_attempts, 5))]),
+      attr("labels", c.tags),
+    ])],
+  }),
+  defineService({
+    id: "kms",
+    name: "Key Management Service",
+    short: "KMS",
+    category: "Security",
+    role: "secrets",
+    tfType: "google_kms_crypto_key",
+    description: "Customer-managed encryption keys and rotation",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/kms_crypto_key",
+    fields: [
+      select("purpose", "Key purpose", ["ENCRYPT_DECRYPT", "ASYMMETRIC_SIGN", "ASYMMETRIC_DECRYPT", "MAC"]),
+      text("rotation_period", "Rotation period", "7776000s"),
+      number("destroy_days", "Destroy delay (days)", "30"),
+      toggle("deletion_protection", "Deletion protection", true),
+    ],
+    emit: (c) => {
+      const ring = `${c.name}_ring`;
+      return [
+        resource("google_kms_key_ring", ring, [attr("name", str(dnsName(`${c.display}-ring`, "key-ring", 63))), attr("location", raw("var.region"))]),
+        resource("google_kms_crypto_key", c.name, [
+          attr("name", str(dnsName(c.display, "key", 63))),
+          attr("key_ring", raw(`google_kms_key_ring.${ring}.id`)),
+          attr("purpose", str(c.v.purpose || "ENCRYPT_DECRYPT")),
+          attr("rotation_period", str(c.v.rotation_period || "7776000s")),
+          attr("destroy_scheduled_duration", str(`${c.v.destroy_days || "30"}d`)),
+          attr("deletion_protection", flag(c.v.deletion_protection, true)),
+          attr("labels", c.tags),
+        ]),
+      ];
+    },
+  }),
+  defineService({
+    id: "cloud_armor",
+    name: "Cloud Armor",
+    short: "ARM",
+    category: "Security",
+    role: "webfirewall",
+    tfType: "google_compute_security_policy",
+    description: "DDoS protection and web application firewall policy",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_security_policy",
+    fields: [
+      select("default_action", "Default action", ["allow", "deny(403)", "deny(404)"]),
+      text("source_ranges", "Allowed source CIDRs", "0.0.0.0/0", "Comma-separated IPv4 or IPv6 CIDRs."),
+      number("priority", "Allow rule priority", "1000"),
+      toggle("preview", "Preview allow rule", false),
+    ],
+    emit: (c) => {
+      const ranges = (c.v.source_ranges || "0.0.0.0/0").split(",").map((value) => value.trim()).filter(Boolean).map(str);
+      return [resource("google_compute_security_policy", c.name, [
+        attr("name", str(dnsName(c.display, "security-policy", 63))),
+        attr("description", str(`Cloud Armor policy for ${c.display}`)),
+        block("rule", [], [
+          attr("action", str("allow")),
+          attr("priority", num(c.v.priority, 1000)),
+          attr("preview", flag(c.v.preview, false)),
+          block("match", [], [attr("versioned_expr", str("SRC_IPS_V1")), block("config", [], [attr("src_ip_ranges", list(...ranges))])]),
+          attr("description", str("Allow configured source networks")),
+        ]),
+        block("rule", [], [
+          attr("action", str(c.v.default_action || "allow")),
+          attr("priority", num(2147483647, 2147483647)),
+          block("match", [], [attr("versioned_expr", str("SRC_IPS_V1")), block("config", [], [attr("src_ip_ranges", list(str("*")))])]),
+          attr("description", str("Default rule")),
+        ]),
+      ])];
+    },
+  }),
+  defineService({
+    id: "vertex_ai_endpoint",
+    name: "Vertex AI Endpoint",
+    short: "VAI",
+    category: "Artificial Intelligence",
+    role: "serverless",
+    tfType: "google_vertex_ai_endpoint",
+    description: "Managed endpoint for online ML model inference",
+    docs: "https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/vertex_ai_endpoint",
+    fields: [
+      text("endpoint_id", "Numeric endpoint id", "1000000001", "Up to 10 digits with no leading zero."),
+      text("description", "Description", "Production inference endpoint"),
+      toggle("dedicated_endpoint", "Dedicated DNS endpoint", false),
+    ],
+    emit: (c) => {
+      c.output({ name: `${c.name}_id`, value: raw(`google_vertex_ai_endpoint.${c.name}.id`), description: `Vertex AI endpoint id for ${c.display}` });
+      return [resource("google_vertex_ai_endpoint", c.name, [
+        attr("name", str(c.v.endpoint_id || "1000000001")),
+        attr("display_name", str(c.display)),
+        attr("description", str(c.v.description || "Production inference endpoint")),
+        attr("location", raw("var.region")),
+        attr("dedicated_endpoint_enabled", flag(c.v.dedicated_endpoint, false)),
+        attr("labels", c.tags),
+      ])];
+    },
+  }),
+];

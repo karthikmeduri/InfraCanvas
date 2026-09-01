@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use InfraCanvas in your work, please cite this repository."
+title: "InfraCanvas: AI visual cloud architecture and infrastructure-as-code builder"
+type: software
+version: 0.1.0
+date-released: 2026-08-31
+abstract: >-
+  InfraCanvas is an open-source, bidirectional infrastructure visual builder for AWS,
+  Azure, Google Cloud, and Oracle Cloud. It turns prompts and diagrams into Terraform
+  and Pulumi, imports infrastructure state into editable diagrams with StateLens, and
+  maps TFwhy drift findings onto cloud architecture resources.
+authors:
+  - family-names: Meduri
+    given-names: Karthik
+  - family-names: Meduri
+    given-names: Sai Sravan
+  - family-names: Podicheti
+    given-names: Srikar
+repository-code: "https://github.com/karthikmeduri/InfraCanvas"
+url: "https://infracanvas-builder.karthik-m.chatgpt.site"
+license: Apache-2.0
+keywords:
+  - Terraform
+  - Pulumi
+  - infrastructure as code
+  - cloud architecture
+  - architecture diagram
+  - AWS
+  - Azure
+  - Google Cloud
+  - Oracle Cloud
+  - drift detection
