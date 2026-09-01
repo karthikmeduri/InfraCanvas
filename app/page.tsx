@@ -1633,7 +1633,10 @@ export default function Home() {
             <i />
             <i />
           </span>
-          <span className="brand-name">InfraCanvas</span>
+          <span className="brand-copy">
+            <span className="brand-name">InfraCanvas</span>
+            <small>The Bidirectional IaC Workspace</small>
+          </span>
           <span className="beta-pill">BETA</span>
         </div>
 
@@ -2789,14 +2792,39 @@ export default function Home() {
                 <i />
                 <i />
               </span>
-              InfraCanvas
+              <span className="modal-brand-copy">
+                <strong>InfraCanvas</strong>
+                <small>The Bidirectional IaC Workspace</small>
+              </span>
             </div>
             <span className="step-chip">STEP 1 OF 3</span>
-            <h1 id="provider-title">Design cloud architecture. Generate real IaC.</h1>
+            <h1 id="provider-title">One graph for your infrastructure lifecycle.</h1>
             <p>
-              Choose AWS, Azure, Google Cloud, or Oracle Cloud. Prompt with AI or drag native
-              services, configure real values, and generate Terraform or Pulumi.
+              Prompt it, draw it, generate real IaC, import its state, and bring drift back to
+              the same editable architecture.
             </p>
+            <ol className="lifecycle-ribbon" aria-label="InfraCanvas bidirectional infrastructure workflow">
+              <li>
+                <span>01</span>
+                <strong>Prompt or draw</strong>
+                <small>AI + visual canvas</small>
+              </li>
+              <li>
+                <span>02</span>
+                <strong>Configure</strong>
+                <small>Provider-native values</small>
+              </li>
+              <li>
+                <span>03</span>
+                <strong>Generate</strong>
+                <small>Terraform + Pulumi</small>
+              </li>
+              <li>
+                <span>04</span>
+                <strong>Reconcile</strong>
+                <small>StateLens + TFwhy</small>
+              </li>
+            </ol>
             <div className="provider-grid">
               {providers.map((item) => (
                 <button
@@ -2860,13 +2888,13 @@ export default function Home() {
             </div>
             <div className="provider-modal-footer">
               <span>
-                <i /> Real provider resources
+                <i /> Four cloud providers
               </span>
               <span>
-                <i /> Connections become references
+                <i /> One editable graph
               </span>
               <span>
-                <i /> Secure-by-default templates
+                <i /> Verified IaC output
               </span>
             </div>
             {nodes.length > 0 && (

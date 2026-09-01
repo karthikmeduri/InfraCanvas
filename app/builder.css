@@ -152,6 +152,23 @@ body {
   color: var(--text);
 }
 
+:root[data-theme="dark"] .brand-copy small,
+:root[data-theme="dark"] .modal-brand-copy small {
+  color: var(--text-faint);
+}
+
+:root[data-theme="dark"] .lifecycle-ribbon {
+  border-color: var(--hairline);
+  background: color-mix(in srgb, var(--violet) 8%, var(--panel-2));
+}
+
+:root[data-theme="dark"] .lifecycle-ribbon strong {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .lifecycle-ribbon small {
+  color: var(--text-muted);
+}
 :root[data-theme="dark"] .provider-mark {
   background: color-mix(in srgb, var(--provider-accent) 24%, var(--panel-2));
   border-color: color-mix(in srgb, var(--provider-accent) 42%, var(--panel-2));

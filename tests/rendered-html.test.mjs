@@ -33,9 +33,12 @@ test("server-renders the InfraCanvas builder", async () => {
   const html = (await response.text()).replaceAll("<!-- -->", "");
   assert.match(
     html,
-    /<title>InfraCanvas by Karthik Meduri — AI Visual Terraform &amp; Pulumi Builder<\/title>/i,
+    /<title>InfraCanvas — The Bidirectional IaC Workspace<\/title>/i,
   );
-  assert.match(html, /Design cloud architecture\. Generate real IaC\./);
+  assert.match(html, /One graph for your infrastructure lifecycle\./);
+  assert.match(html, /The Bidirectional IaC Workspace/);
+  assert.match(html, /Prompt or draw/);
+  assert.match(html, /StateLens \+ TFwhy/);
   assert.match(html, /rel="canonical" href="https:\/\/infracanvas-builder\.karthik-m\.chatgpt\.site\/"/);
   assert.match(html, /"@type":"SoftwareApplication"/);
   assert.match(html, /Natural-language prompt to editable cloud architecture diagram/);
@@ -102,7 +105,7 @@ test("ships product code rather than starter scaffolding", async () => {
   assert.match(page, /setData\("text\/plain", service\.id\)/);
   assert.match(page, /A stale scroll position must never make a successful drop/);
   assert.match(page, /@\/lib\/terraform\/generate/);
-  assert.match(layout, /InfraCanvas by Karthik Meduri — AI Visual Terraform/);
+  assert.match(layout, /InfraCanvas — The Bidirectional IaC Workspace/);
   assert.match(layout, /SoftwareApplication/);
   assert.match(layout, /codeRepository/);
   assert.doesNotMatch(layout, /Starter Project|codex-preview|_sites-preview/);

@@ -1,0 +1,64 @@
+name: Feature request
+description: Propose a workflow or capability for the bidirectional IaC workspace
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping InfraCanvas close the loop between architecture, IaC, state, and drift.
+        Please describe the user problem before proposing an implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who is blocked, what are they trying to accomplish, and why do current workflows fail?
+      placeholder: As a platform engineer, I need...
+    validations:
+      required: true
+  - type: dropdown
+    id: lifecycle
+    attributes:
+      label: Lifecycle area
+      options:
+        - Prompt to diagram
+        - Visual architecture and configuration
+        - Diagram to Terraform or Pulumi
+        - StateLens state import
+        - TFwhy drift and reconciliation
+        - Validation, policy, or cost
+        - GitOps, deployment, or collaboration
+        - Provider or service coverage
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Cloud provider
+      options:
+        - Provider-neutral
+        - AWS
+        - Azure
+        - Google Cloud
+        - Oracle Cloud
+        - Multiple providers
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Expected workflow
+      description: Describe the smallest end-to-end experience that would solve the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Security and safety constraints
+      description: Include credential, state, approval, privacy, or deployment concerns.
+  - type: textarea
+    id: example
+    attributes:
+      label: Example or supporting material
+      description: Add a small architecture, state shape, provider documentation, or mockup if useful.

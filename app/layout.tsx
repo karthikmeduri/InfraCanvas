@@ -4,15 +4,15 @@ import "./globals.css";
 import "./builder.css";
 
 const siteUrl = process.env.SITE_URL ?? "https://infracanvas-builder.karthik-m.chatgpt.site";
-const title = "InfraCanvas by Karthik Meduri — AI Visual Terraform & Pulumi Builder";
+const title = "InfraCanvas — The Bidirectional IaC Workspace";
 const description =
-  "Open-source AI cloud architecture builder for AWS, Azure, GCP and OCI. Prompt or draw diagrams, generate Terraform and Pulumi, import state, and detect drift.";
+  "The open-source bidirectional infrastructure workspace for AWS, Azure, GCP and OCI: prompt or draw, generate Terraform and Pulumi, import state, and visualize drift.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title,
   description,
-  applicationName: "InfraCanvas by Karthik Meduri",
+  applicationName: "InfraCanvas — The Bidirectional IaC Workspace",
   authors: [
     { name: "Karthik Meduri", url: "https://github.com/karthikmeduri" },
     { name: "Sai Sravan Meduri" },
@@ -22,6 +22,7 @@ export const metadata: Metadata = {
   publisher: "InfraCanvas open-source project",
   category: "Developer Tools",
   keywords: [
+    "bidirectional IaC workspace",
     "visual Terraform builder",
     "AI cloud architecture generator",
     "infrastructure visual builder",
@@ -55,7 +56,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: siteUrl,
-    siteName: "InfraCanvas by Karthik Meduri",
+    siteName: "InfraCanvas — The Bidirectional IaC Workspace",
     title,
     description,
     images: [
@@ -79,7 +80,7 @@ const productStructuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "InfraCanvas by Karthik Meduri",
-  alternateName: "InfraCanvas AI Visual IaC Builder",
+  alternateName: ["InfraCanvas Bidirectional IaC Workspace", "InfraCanvas AI Visual IaC Builder"],
   applicationCategory: "DeveloperApplication",
   applicationSubCategory: "Infrastructure as Code and Cloud Architecture",
   operatingSystem: "Web",
@@ -94,6 +95,7 @@ const productStructuredData = {
     { "@type": "Person", name: "Srikar Podicheti" },
   ],
   featureList: [
+    "Bidirectional prompt, diagram, IaC, state, and drift workflow",
     "Natural-language prompt to editable cloud architecture diagram",
     "Visual AWS, Azure, Google Cloud, and Oracle Cloud architecture builder",
     "Terraform and Pulumi code generation",

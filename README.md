@@ -2,7 +2,7 @@
 
 # ◢ InfraCanvas
 
-### AI visual cloud architecture builder for Terraform and Pulumi
+### The Bidirectional IaC Workspace
 
 [![InfraCanvas — draw cloud architecture and generate Terraform or Pulumi](public/og.png)](https://infracanvas-builder.karthik-m.chatgpt.site)
 
@@ -14,29 +14,42 @@
 [![Cloudflare](https://img.shields.io/badge/Cloudflare-Workers-FF8A00?style=flat-square&logo=cloudflare)](https://workers.cloudflare.com/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-C7F36B?style=flat-square)](LICENSE)
 
-**InfraCanvas by Karthik Meduri is an open-source, bidirectional infrastructure visual builder for AWS, Azure, Google Cloud, and Oracle Cloud.**
-**Prompt or draw an architecture, generate Terraform and Pulumi, import live state with StateLens, and visualize configuration drift with TFwhy.**
+**One graph for the entire infrastructure lifecycle across AWS, Azure, Google Cloud, and Oracle Cloud.**
+**Prompt it. Draw it. Configure it. Generate Terraform or Pulumi. Import state. Visualize drift.**
 
-**1,188 official cloud services · 119 IaC-ready components · 4 clouds · one editable architecture graph.**
+**1,188 official cloud services · 119 IaC-ready components · 4 clouds · one bidirectional workspace.**
 
 ### [Launch the live InfraCanvas builder →](https://infracanvas-builder.karthik-m.chatgpt.site)
 
 </div>
 
-## Why this project is different
+## The InfraCanvas loop
 
-Most infrastructure diagram tools travel in one direction. InfraCanvas connects the entire
-infrastructure lifecycle around one editable graph:
+Most infrastructure tools stop after drawing a diagram, generating code, or visualizing an
+existing stack. InfraCanvas keeps those workflows connected to one editable architecture graph:
+
+```mermaid
+flowchart LR
+    A["Prompt or draw"] --> B["Configure"]
+    B --> C["Terraform or Pulumi"]
+    C --> D["Infrastructure state"]
+    D --> E["StateLens diagram"]
+    E --> F["TFwhy drift"]
+    F --> B
+```
 
 | Start with | InfraCanvas produces |
 | --- | --- |
-| A natural-language application brief | An AI-proposed, catalog-backed architecture with guided configuration |
+| A natural-language application brief | A catalog-backed architecture draft with guided configuration |
 | A visual AWS, Azure, GCP, or OCI diagram | Complete Terraform modules and Pulumi TypeScript projects |
 | Terraform or Pulumi state | An editable architecture diagram through StateLens |
 | A TFwhy drift report | Drift findings mapped back to the affected canvas resources |
 
-That makes InfraCanvas more than a Terraform visualizer: it is a prompt-to-diagram,
-diagram-to-IaC, state-to-diagram, and drift-to-canvas workflow in one open-source application.
+This is why InfraCanvas is **The Bidirectional IaC Workspace**: prompt-to-diagram,
+diagram-to-IaC, state-to-diagram, and drift-to-canvas live in one open-source application.
+See the [product vision](docs/vision.md) and [public roadmap](ROADMAP.md) for the capability
+boundary and the work ahead.
+
 This repository is created by **Karthik Meduri**, **Sai Sravan Meduri**, and **Srikar Podicheti**.
 
 ## See InfraCanvas in action
@@ -409,12 +422,9 @@ resolver picks it up automatically. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Roadmap
 
-- [x] Import Terraform and Pulumi state back onto the canvas with StateLens
-- [ ] Nested VPC / VNet / VCN container groups
-- [ ] Cost estimates per node
-- [ ] Reusable module output instead of a flat file set
-- [ ] Shareable project links and team workspaces
-- [x] TFwhy drift report visualisation and canvas highlighting
+The roadmap is organized around closing the infrastructure loop without weakening safety:
+architecture reconciliation, cost estimation, reusable modules, GitOps, review-gated deployment,
+and team collaboration. See [ROADMAP.md](ROADMAP.md) for current, next, and later milestones.
 
 ## Contributing
 
@@ -440,6 +450,6 @@ InfraCanvas is an original idea jointly conceived by:
 
 <div align="center">
 
-**InfraCanvas** · Infrastructure design that stays close to the code.
+**InfraCanvas** · The Bidirectional IaC Workspace.
 
 </div>

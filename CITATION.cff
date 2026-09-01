@@ -1,11 +1,11 @@
 cff-version: 1.2.0
 message: "If you use InfraCanvas in your work, please cite this repository."
-title: "InfraCanvas: AI visual cloud architecture and infrastructure-as-code builder"
+title: "InfraCanvas: The Bidirectional IaC Workspace"
 type: software
 version: 0.1.0
 date-released: 2026-08-31
 abstract: >-
-  InfraCanvas is an open-source, bidirectional infrastructure visual builder for AWS,
+  InfraCanvas is the open-source Bidirectional IaC Workspace for AWS,
   Azure, Google Cloud, and Oracle Cloud. It turns prompts and diagrams into Terraform
   and Pulumi, imports infrastructure state into editable diagrams with StateLens, and
   maps TFwhy drift findings onto cloud architecture resources.
