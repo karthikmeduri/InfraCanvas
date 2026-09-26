@@ -44,11 +44,22 @@ flowchart LR
 | A visual AWS, Azure, GCP, or OCI diagram | Complete Terraform modules and Pulumi TypeScript projects |
 | Terraform or Pulumi state | An editable architecture diagram through StateLens |
 | A TFwhy drift report | Drift findings mapped back to the affected canvas resources |
+| A repository architecture snapshot | A pull-request review with resource, connection, risk, and layout changes |
 
 This is why InfraCanvas is **The Bidirectional IaC Workspace**: prompt-to-diagram,
 diagram-to-IaC, state-to-diagram, and drift-to-canvas live in one open-source application.
 See the [product vision](docs/vision.md) and [public roadmap](ROADMAP.md) for the capability
 boundary and the work ahead.
+
+## Change Intelligence — architecture pull requests
+
+Export `infracanvas.architecture.json` from the builder and commit it with an infrastructure
+change. The included GitHub workflow compares the base and proposed diagrams, then posts a single
+updated pull-request review with added, removed, modified, and moved resources; connection changes;
+risk-oriented warnings; and downloadable before/after SVG diagrams. Credential-shaped fields are
+redacted, snapshot input is strictly validated, and forked pull requests remain read-only.
+
+See [the Change Intelligence guide](docs/change-intelligence.md) for setup and the local CLI.
 
 This repository is created by **Karthik Meduri**, **Sai Sravan Meduri**, and **Srikar Podicheti**.
 

@@ -37,6 +37,10 @@ import {
 } from "@/lib/drift";
 import { diagramToSvg, svgToPngBlob } from "@/lib/export-diagram";
 import { removeDiagramEdge } from "@/lib/diagram";
+import {
+  ARCHITECTURE_SNAPSHOT_FILENAME,
+  createArchitectureSnapshot,
+} from "@/lib/change-intelligence";
 import { safeName } from "@/lib/hcl";
 import { HighlightedCode } from "@/lib/highlight";
 import { ProviderMark, ServiceArtwork } from "@/lib/icons";
@@ -1442,6 +1446,20 @@ export default function Home() {
     }
   };
 
+  const exportArchitectureSnapshot = () => {
+    const snapshot = createArchitectureSnapshot({
+      providerId,
+      projectName,
+      nodes,
+      edges,
+    });
+    downloadBlob(
+      new Blob([`${JSON.stringify(snapshot, null, 2)}\n`], { type: "application/json;charset=utf-8" }),
+      ARCHITECTURE_SNAPSHOT_FILENAME,
+    );
+    notify("Repository snapshot exported for Change Intelligence");
+  };
+
   /* ------------------------------------------------------------- shortcuts */
   // The listener is attached once; this ref keeps it pointed at the latest
   // command closures without re-subscribing on every render.
@@ -2056,6 +2074,13 @@ export default function Home() {
               </button>
               <button onClick={exportPng} disabled={nodes.length === 0} title="Export diagram as PNG">
                 PNG
+              </button>
+              <button
+                onClick={exportArchitectureSnapshot}
+                disabled={nodes.length === 0}
+                title="Export a sanitized repository snapshot for architecture pull request reviews"
+              >
+                PR JSON
               </button>
             </div>
 
