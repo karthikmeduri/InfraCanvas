@@ -6,7 +6,7 @@ explicitly scoped end-to-end slice with remaining work recorded.
 
 | # | Feature | Status | Branch / PR | Scope and evidence |
 | ---: | --- | --- | --- | --- |
-| 1 | Architecture Pull Requests / Change Intelligence | In progress | `codex/feature-change-intelligence` | Repository snapshot export, validated diff engine, before/after SVGs, GitHub PR report, security tests |
+| 1 | Architecture Pull Requests / Change Intelligence | Complete | [`codex/feature-change-intelligence` · PR #6](https://github.com/karthikmeduri/InfraCanvas/pull/6) | 46 generator/security tests + 4 rendered tests; typecheck, lint, build, and CLI smoke test passed. One root snapshot per repository in this slice. |
 | 2 | Four-way Reconciliation Center | Next | — | Canvas ↔ IaC ↔ state ↔ live cloud review |
 | 3 | Secure cloud connection | Planned | — | Short-lived identity and least privilege |
 | 4 | Cost and security overlays | Planned | — | Canvas and PR-level impact views |
@@ -22,3 +22,15 @@ explicitly scoped end-to-end slice with remaining work recorded.
 - New feature branch from the latest `main`; never merge automatically.
 - Typecheck, lint, tests, production build, relevant IaC validation, and security checks are required.
 - No long-lived cloud credentials, hidden deployment, weakened branch protection, or silent scope claims.
+
+## Run log
+
+### 2026-09-26 · Change Intelligence
+
+- Added deterministic, redacted repository snapshots and the builder's **PR JSON** action.
+- Added architecture resource, configuration, connection, risk, and layout diffing.
+- Added before/after SVGs, machine-readable JSON, Markdown review output, and PR comment updates.
+- Hardened fork handling by executing only the trusted base commit and parsing contributor snapshots
+  as bounded untrusted data.
+- Pull request: [#6](https://github.com/karthikmeduri/InfraCanvas/pull/6)
+- Next: four-way Reconciliation Center.
