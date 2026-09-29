@@ -24,7 +24,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 
 ## Next: close the reconciliation loop
 
-- [ ] Compare canvas configuration, generated IaC, imported state, and drift in one review
+- [x] Compare canvas configuration, generated IaC, imported state, and TFwhy live drift in one review
 - [ ] Let users choose the desired source of truth for each detected difference
 - [ ] Generate a reviewable correction without silently changing the canvas or cloud
 - [ ] Add nested VPC, VNet, and VCN boundary groups

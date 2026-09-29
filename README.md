@@ -300,6 +300,18 @@ The report is parsed entirely in the browser tab. InfraCanvas does not upload th
 Terraform state, or cloud credentials, and it deliberately does not execute Terraform in
 the hosted web application. See [the integration and security model](docs/tfwhy-integration.md).
 
+## Reconciliation Center — four sources, one review
+
+Open **Reconcile** to compare the architecture on the canvas with the Terraform generated from it,
+the most recently imported StateLens snapshot, and the most recently imported TFwhy scan. Every
+deployable resource receives an evidence row showing whether it is present, missing, changed, or
+not yet loaded in each source. Configuration differences and unmatched state or live resources are
+called out with a safe next step.
+
+The comparison is intentionally read-only: it never runs Terraform, contacts a cloud account, or
+silently chooses which version is correct. Until short-lived cloud identity is added, the **Live**
+column means the user-imported TFwhy snapshot—not a persistent connection to the provider.
+
 <details>
 <summary><b>Keyboard shortcuts</b></summary>
 

@@ -27,6 +27,7 @@ import {
   type ArchitecturePlan,
 } from "@/lib/ai-architect";
 import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
+import { ReconciliationWorkspace } from "@/app/components/ReconciliationWorkspace";
 import { StateLensWorkspace, type LoadedState } from "@/app/components/StateLensWorkspace";
 import {
   canvasTerraformResources,
@@ -41,6 +42,7 @@ import { safeName } from "@/lib/hcl";
 import { HighlightedCode } from "@/lib/highlight";
 import { ProviderMark, ServiceArtwork } from "@/lib/icons";
 import { generatePulumi } from "@/lib/pulumi/generate";
+import { reconcileArchitecture } from "@/lib/reconciliation";
 import { generate } from "@/lib/terraform/generate";
 import { parseStateFile } from "@/lib/state-lens";
 import type {
@@ -162,6 +164,7 @@ export default function Home() {
   const [stateLensOpen, setStateLensOpen] = useState(false);
   const [stateLensImport, setStateLensImport] = useState<LoadedState | null>(null);
   const [stateLensError, setStateLensError] = useState("");
+  const [reconciliationOpen, setReconciliationOpen] = useState(false);
   const [welcomeFeature, setWelcomeFeature] = useState<"statelens" | "drift" | null>(null);
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -241,6 +244,15 @@ export default function Home() {
     if (!nodeId) return;
     driftByNode.set(nodeId, [...(driftByNode.get(nodeId) ?? []), finding]);
   });
+  const reconciliation = reconcileArchitecture(
+    provider,
+    nodes,
+    generated.files,
+    stateLensImport?.preview ?? null,
+    driftReport?.report ?? null,
+  );
+  const reconciliationReviewCount =
+    reconciliation.summary.attention + reconciliation.summary.drift + reconciliation.summary.untracked;
 
   const currentFile =
     activeGenerated.files.find((file) => file.path === activeFile) ?? activeGenerated.files[0];
@@ -323,6 +335,7 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setReconciliationOpen(false);
     if (welcomeFeature) setProviderPickerOpen(true);
     setWelcomeFeature(null);
   };
@@ -332,6 +345,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setStateLensOpen(false);
+    setReconciliationOpen(false);
     setDriftOpen(true);
     if (fromWelcome) setWelcomeFeature("drift");
   };
@@ -341,6 +355,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
+    setReconciliationOpen(false);
     setStateLensOpen(true);
     if (fromWelcome) setWelcomeFeature("statelens");
   };
@@ -350,7 +365,17 @@ export default function Home() {
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setReconciliationOpen(false);
     setCodeOpen(true);
+  };
+
+  const showReconciliation = () => {
+    setAiArchitectOpen(false);
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setReconciliationOpen(true);
   };
 
   const showAiArchitect = () => {
@@ -358,6 +383,7 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setReconciliationOpen(false);
     setExamplePromptOpen(false);
     setAiPlan(null);
     setAiError("");
@@ -737,6 +763,7 @@ export default function Home() {
       setCodeOpen(false);
       setDriftOpen(false);
       setStateLensOpen(false);
+      setReconciliationOpen(false);
       setWelcomeFeature(null);
       setStateLensImport(null);
       setStateLensError("");
@@ -802,6 +829,7 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setReconciliationOpen(false);
     setDriftReport(null);
     setDriftImportError("");
     setStartupProvider(null);
@@ -1083,6 +1111,8 @@ export default function Home() {
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setCodeOpen(false);
+    setStateLensOpen(false);
+    setReconciliationOpen(false);
     setSelection([nodeId]);
     setSelectedEdgeId(null);
     window.requestAnimationFrame(() => {
@@ -1094,6 +1124,9 @@ export default function Home() {
     setIssuesOpen(true);
     setActiveIssueId(issue.id);
     setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setReconciliationOpen(false);
     if (issue.nodeId) {
       setSelection([issue.nodeId]);
       setSelectedEdgeId(null);
@@ -1451,6 +1484,7 @@ export default function Home() {
     codeOpen,
     connectMode,
     connectionStart,
+    driftOpen,
     deleteSelection,
     duplicateSelection,
     examplePromptOpen,
@@ -1458,10 +1492,13 @@ export default function Home() {
     notify,
     pendingProvider,
     redo,
+    reconciliationOpen,
     saveProject,
     shortcutsOpen,
     snapToGrid,
     startupProvider,
+    stateLensOpen,
+    showGeneratedCode,
     undo,
     zoomToFit,
   });
@@ -1472,6 +1509,7 @@ export default function Home() {
       codeOpen,
       connectMode,
       connectionStart,
+      driftOpen,
       deleteSelection,
       duplicateSelection,
       examplePromptOpen,
@@ -1479,10 +1517,13 @@ export default function Home() {
       notify,
       pendingProvider,
       redo,
+      reconciliationOpen,
       saveProject,
       shortcutsOpen,
       snapToGrid,
       startupProvider,
+      stateLensOpen,
+      showGeneratedCode,
       undo,
       zoomToFit,
     };
@@ -1496,6 +1537,7 @@ export default function Home() {
         codeOpen,
         connectMode,
         connectionStart,
+        driftOpen,
         deleteSelection,
         duplicateSelection,
         examplePromptOpen,
@@ -1503,10 +1545,13 @@ export default function Home() {
         notify,
         pendingProvider,
         redo,
+        reconciliationOpen,
         saveProject,
         shortcutsOpen,
         snapToGrid,
         startupProvider,
+        stateLensOpen,
+        showGeneratedCode,
         undo,
         zoomToFit,
       } = commandsRef.current;
@@ -1529,6 +1574,9 @@ export default function Home() {
         if (pendingProvider) return setPendingProvider(null);
         if (connectionStart || connectMode) return cancelConnection();
         if (codeOpen) return setCodeOpen(false);
+        if (reconciliationOpen) return setReconciliationOpen(false);
+        if (stateLensOpen) return setStateLensOpen(false);
+        if (driftOpen) return setDriftOpen(false);
         setSelection([]);
         setSelectedEdgeId(null);
         return;
@@ -1541,7 +1589,8 @@ export default function Home() {
       }
       if (mod && event.key === "Enter") {
         event.preventDefault();
-        setCodeOpen((current) => !current);
+        if (codeOpen) setCodeOpen(false);
+        else showGeneratedCode();
         return;
       }
       if (mod && event.key.toLowerCase() === "z") {
@@ -1698,9 +1747,9 @@ export default function Home() {
             Save
           </button>
           <button
-            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen ? "active" : ""}`}
+            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !reconciliationOpen && !aiArchitectOpen ? "active" : ""}`}
             onClick={showBuilder}
-            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen}
+            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !reconciliationOpen && !aiArchitectOpen}
             title="Return to the architecture builder"
           >
             <span className="builder-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
@@ -1725,6 +1774,16 @@ export default function Home() {
             <span className="statelens-nav-icon" aria-hidden="true"><i /><i /></span>
             StateLens
             {stateLensImport && <b>{stateLensImport.preview.matched.length}</b>}
+          </button>
+          <button
+            className={`reconcile-nav-button ${reconciliationOpen ? "active" : ""}`}
+            onClick={showReconciliation}
+            aria-pressed={reconciliationOpen}
+            title="Compare canvas, generated IaC, imported state, and a TFwhy live snapshot"
+          >
+            <span className="reconcile-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
+            Reconcile
+            {reconciliationReviewCount > 0 && <b>{reconciliationReviewCount}</b>}
           </button>
           <button
             className={`ai-nav-button ${aiArchitectOpen ? "active" : ""}`}
@@ -1806,7 +1865,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!codeOpen && !driftOpen && !stateLensOpen && (
+      {!codeOpen && !driftOpen && !stateLensOpen && !reconciliationOpen && (
         <section
           className="workspace"
           style={{ "--provider-accent": provider.accent } as CSSProperties}
@@ -3238,6 +3297,19 @@ export default function Home() {
             <button onClick={() => setShortcutsOpen(false)}>Close</button>
           </section>
         </div>
+      )}
+
+      {reconciliationOpen && (
+        <ReconciliationWorkspace
+          result={reconciliation}
+          providerName={provider.name}
+          stateLabel={stateLensImport?.fileName}
+          liveLabel={driftReport?.fileName}
+          onBack={showBuilder}
+          onOpenStateLens={() => showStateLens()}
+          onOpenDrift={() => showDrift()}
+          onFocusNode={focusDriftNode}
+        />
       )}
 
       {stateLensOpen && (

@@ -16,6 +16,7 @@ export {
   planNodeDefaults,
 } from "../../lib/ai-architect";
 export { removeDiagramEdge } from "../../lib/diagram";
+export { parseGeneratedIaCResources, reconcileArchitecture } from "../../lib/reconciliation";
 export {
   canvasTerraformResources,
   highestDriftSeverity,
