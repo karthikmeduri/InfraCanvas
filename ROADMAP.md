@@ -19,6 +19,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [x] Pulumi TypeScript project generation from the same architecture
 - [x] StateLens imports for Terraform state, Terraform plan JSON, and Pulumi stack exports
 - [x] TFwhy drift reports mapped to affected canvas resources
+- [x] AWS OIDC trust-packet preparation with exact identity conditions and read-only inventory scope
 - [x] SVG, PNG, JSON, Terraform, and Pulumi project exports
 - [x] Secure production-scale example architectures for every supported provider
 
@@ -36,6 +37,8 @@ This roadmap is public so users can distinguish shipped capability from product 
 
 - [ ] Git provider integration that exports to a branch and opens a pull request
 - [ ] CI templates for formatting, validation, policy checks, and preview artifacts
+- [ ] Hosted token broker and live AWS inventory sessions using the prepared short-lived trust
+- [ ] Azure, Google Cloud, and OCI workload-identity federation setup packets
 - [ ] Review-gated deployment using short-lived cloud credentials
 - [ ] Plan-before-apply, explicit approval, audit history, and cancellation controls
 - [ ] Team workspaces, comments, saved versions, and architecture approval roles

@@ -17,6 +17,12 @@ export {
 } from "../../lib/ai-architect";
 export { removeDiagramEdge } from "../../lib/diagram";
 export {
+  AWS_CONNECTION_SESSION_MINUTES,
+  AWS_INVENTORY_PERMISSION_COUNT,
+  generateAwsConnectionBundle,
+  validateAwsConnectionDraft,
+} from "../../lib/cloud-connect";
+export {
   canvasTerraformResources,
   highestDriftSeverity,
   matchDriftFindings,

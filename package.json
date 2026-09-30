@@ -10,8 +10,9 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run build && npm run test:generator && node --test tests/rendered-html.test.mjs",
-    "test:generator": "esbuild build/test-entry/generator.ts --bundle --format=esm --platform=node --outfile=dist/generator-test-bundle.mjs && node --test tests/terraform-generation.test.mjs tests/pulumi-generation.test.mjs tests/exports.test.mjs tests/drift-integration.test.mjs tests/state-lens.test.mjs tests/catalog-expansion.test.mjs tests/ai-architect.test.mjs",
+    "test:generator": "esbuild build/test-entry/generator.ts --bundle --format=esm --platform=node --outfile=dist/generator-test-bundle.mjs && node --test tests/terraform-generation.test.mjs tests/pulumi-generation.test.mjs tests/exports.test.mjs tests/drift-integration.test.mjs tests/state-lens.test.mjs tests/catalog-expansion.test.mjs tests/ai-architect.test.mjs tests/cloud-connect.test.mjs",
     "emit:terraform": "node scripts/emit-terraform.mjs",
+    "emit:cloud-connect": "npm run test:generator && node scripts/emit-cloud-connect.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

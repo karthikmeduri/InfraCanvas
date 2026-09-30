@@ -28,6 +28,7 @@ import {
 } from "@/lib/ai-architect";
 import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
 import { StateLensWorkspace, type LoadedState } from "@/app/components/StateLensWorkspace";
+import { CloudConnectWorkspace } from "@/app/components/CloudConnectWorkspace";
 import {
   canvasTerraformResources,
   highestDriftSeverity,
@@ -162,7 +163,8 @@ export default function Home() {
   const [stateLensOpen, setStateLensOpen] = useState(false);
   const [stateLensImport, setStateLensImport] = useState<LoadedState | null>(null);
   const [stateLensError, setStateLensError] = useState("");
-  const [welcomeFeature, setWelcomeFeature] = useState<"statelens" | "drift" | null>(null);
+  const [cloudConnectOpen, setCloudConnectOpen] = useState(false);
+  const [welcomeFeature, setWelcomeFeature] = useState<"statelens" | "drift" | "connect" | null>(null);
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
@@ -323,6 +325,7 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setCloudConnectOpen(false);
     if (welcomeFeature) setProviderPickerOpen(true);
     setWelcomeFeature(null);
   };
@@ -332,6 +335,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setStateLensOpen(false);
+    setCloudConnectOpen(false);
     setDriftOpen(true);
     if (fromWelcome) setWelcomeFeature("drift");
   };
@@ -341,8 +345,19 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
+    setCloudConnectOpen(false);
     setStateLensOpen(true);
     if (fromWelcome) setWelcomeFeature("statelens");
+  };
+
+  const showCloudConnect = (fromWelcome = false) => {
+    setAiArchitectOpen(false);
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setCloudConnectOpen(true);
+    if (fromWelcome) setWelcomeFeature("connect");
   };
 
   const showGeneratedCode = () => {
@@ -350,6 +365,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setCloudConnectOpen(false);
     setCodeOpen(true);
   };
 
@@ -358,6 +374,7 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setCloudConnectOpen(false);
     setExamplePromptOpen(false);
     setAiPlan(null);
     setAiError("");
@@ -1698,9 +1715,9 @@ export default function Home() {
             Save
           </button>
           <button
-            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen ? "active" : ""}`}
+            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !cloudConnectOpen && !aiArchitectOpen ? "active" : ""}`}
             onClick={showBuilder}
-            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen}
+            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !cloudConnectOpen && !aiArchitectOpen}
             title="Return to the architecture builder"
           >
             <span className="builder-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
@@ -1734,6 +1751,15 @@ export default function Home() {
           >
             <span className="ai-nav-icon" aria-hidden="true"><i /><i /><i /></span>
             AI Architect
+          </button>
+          <button
+            className={`cloud-connect-nav-button ${cloudConnectOpen ? "active" : ""}`}
+            onClick={() => showCloudConnect()}
+            aria-pressed={cloudConnectOpen}
+            title="Prepare a short-lived, least-privilege cloud identity trust"
+          >
+            <span className="cloud-connect-nav-icon" aria-hidden="true"><i /><i /></span>
+            Connect
           </button>
           <button
             className={`generate-button ${codeOpen ? "active" : ""}`}
@@ -1806,7 +1832,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!codeOpen && !driftOpen && !stateLensOpen && (
+      {!codeOpen && !driftOpen && !stateLensOpen && !cloudConnectOpen && (
         <section
           className="workspace"
           style={{ "--provider-accent": provider.accent } as CSSProperties}
@@ -2885,6 +2911,21 @@ export default function Home() {
                 <span className="welcome-feature-action">Open drift <i aria-hidden="true">→</i></span>
                 <span className="welcome-feature-glow" aria-hidden="true" />
               </button>
+              <button
+                className="welcome-feature-card connect-feature-card"
+                onClick={() => showCloudConnect(true)}
+              >
+                <span className="welcome-feature-icon connect-welcome-icon" aria-hidden="true">
+                  <i /><i />
+                </span>
+                <span className="welcome-feature-copy">
+                  <small>SHORT-LIVED CLOUD IDENTITY</small>
+                  <strong>Prepare Secure Connect</strong>
+                  <p>Create an exact OIDC trust and least-privilege AWS inventory setup—without access keys.</p>
+                </span>
+                <span className="welcome-feature-action">Prepare trust <i aria-hidden="true">→</i></span>
+                <span className="welcome-feature-glow" aria-hidden="true" />
+              </button>
             </div>
             <div className="provider-modal-footer">
               <span>
@@ -3264,6 +3305,10 @@ export default function Home() {
           onFocusNode={focusDriftNode}
           onCopy={copyText}
         />
+      )}
+
+      {cloudConnectOpen && (
+        <CloudConnectWorkspace onBack={showBuilder} onCopy={copyText} />
       )}
 
       {codeOpen && (
