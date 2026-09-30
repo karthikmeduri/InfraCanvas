@@ -598,7 +598,7 @@ body {
 .welcome-feature-grid {
   margin-bottom: 18px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -644,6 +644,7 @@ body {
 
 .statelens-feature-card { --feature-color: #8b5cf6; }
 .drift-feature-card { --feature-color: var(--ok); }
+.connect-feature-card { --feature-color: #22d3ee; }
 
 .welcome-feature-icon {
   width: 47px;
@@ -694,6 +695,24 @@ body {
 .drift-welcome-icon i:nth-child(1) { height: 11px; }
 .drift-welcome-icon i:nth-child(2) { height: 22px; }
 .drift-welcome-icon i:nth-child(3) { height: 16px; }
+
+.connect-welcome-icon i:first-child {
+  width: 19px;
+  height: 20px;
+  border: 2px solid currentColor;
+  border-radius: 6px 6px 9px 9px;
+  clip-path: polygon(50% 0, 100% 20%, 100% 58%, 50% 100%, 0 58%, 0 20%);
+}
+
+.connect-welcome-icon i:last-child {
+  width: 7px;
+  height: 5px;
+  position: absolute;
+  top: 20px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
 
 .welcome-feature-copy {
   min-width: 0;
@@ -2649,7 +2668,290 @@ body {
 .statelens-build-button { min-height: 46px; padding: 0 20px; white-space: nowrap; }
 .statelens-build-button span { margin-left: 8px; font-size: 16px; }
 
+/* --- Secure Cloud Connect ------------------------------------------------ */
+
+.cloud-connect-nav-button {
+  min-height: 38px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, #22d3ee 38%, var(--hairline));
+  border-radius: 8px;
+  background: color-mix(in srgb, #22d3ee 7%, var(--panel));
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 730;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.cloud-connect-nav-button:hover,
+.cloud-connect-nav-button.active {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, #22d3ee 78%, var(--hairline));
+  background: color-mix(in srgb, #22d3ee 14%, var(--panel));
+  box-shadow: 0 6px 20px color-mix(in srgb, #22d3ee 16%, transparent);
+}
+
+.cloud-connect-nav-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, #22d3ee 30%, transparent);
+  outline-offset: 2px;
+}
+
+.cloud-connect-nav-icon,
+.cloud-connect-logo {
+  width: 19px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  position: relative;
+}
+
+.cloud-connect-nav-icon i:first-child,
+.cloud-connect-logo i:first-child {
+  width: 17px;
+  height: 19px;
+  border: 2px solid #22d3ee;
+  border-radius: 6px 6px 9px 9px;
+  clip-path: polygon(50% 0, 100% 20%, 100% 58%, 50% 100%, 0 58%, 0 20%);
+}
+
+.cloud-connect-nav-icon i:last-child,
+.cloud-connect-logo i:last-child {
+  width: 7px;
+  height: 5px;
+  position: absolute;
+  top: 7px;
+  border-left: 2px solid #22d3ee;
+  border-bottom: 2px solid #22d3ee;
+  transform: rotate(-45deg);
+}
+
+.cloud-connect-page {
+  height: calc(100vh - 108px);
+  overflow: auto;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 14% 0%, color-mix(in srgb, #22d3ee 13%, transparent), transparent 34%),
+    radial-gradient(circle at 88% 8%, color-mix(in srgb, #3b82f6 10%, transparent), transparent 32%),
+    var(--app-bg);
+}
+
+.cloud-connect-header {
+  min-height: 76px;
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.cloud-connect-header > div,
+.cloud-connect-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cloud-connect-header small,
+.cloud-connect-header h2 { display: block; margin: 0; }
+.cloud-connect-header small { color: #0891b2; font-size: 9px; font-weight: 830; letter-spacing: .12em; }
+:root[data-theme="dark"] .cloud-connect-header small { color: #67e8f9; }
+.cloud-connect-header h2 { margin-top: 2px; font: 740 20px/1.1 "Space Grotesk", "Segoe UI", sans-serif; letter-spacing: -.03em; }
+.cloud-connect-logo { width: 39px; height: 39px; border: 1px solid color-mix(in srgb, #22d3ee 38%, var(--hairline)); border-radius: 11px; background: color-mix(in srgb, #22d3ee 10%, var(--panel-2)); box-shadow: 0 0 20px color-mix(in srgb, #22d3ee 12%, transparent); }
+
+.connection-safety-pill {
+  min-height: 34px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--ok) 34%, var(--hairline));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 7%, var(--panel-2));
+  color: color-mix(in srgb, var(--ok) 70%, var(--text));
+  font-size: 9px;
+  font-weight: 760;
+}
+.connection-safety-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 9px var(--ok); }
+
+.cloud-connect-security-strip {
+  min-height: 52px;
+  padding: 10px max(18px, calc((100% - 1180px) / 2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  border-bottom: 1px solid color-mix(in srgb, #22d3ee 24%, var(--hairline));
+  background: color-mix(in srgb, #22d3ee 5%, var(--panel));
+}
+.cloud-connect-security-strip p { max-width: 920px; margin: 0; color: var(--text-muted); font-size: 10px; line-height: 1.55; }
+.cloud-connect-security-strip strong { color: var(--text); }
+
+.connect-shield {
+  width: 25px;
+  height: 27px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  position: relative;
+  border: 2px solid #22d3ee;
+  border-radius: 7px 7px 11px 11px;
+  clip-path: polygon(50% 0, 100% 18%, 100% 60%, 50% 100%, 0 60%, 0 18%);
+}
+.connect-shield i { width: 7px; height: 5px; border-left: 2px solid #22d3ee; border-bottom: 2px solid #22d3ee; transform: rotate(-45deg); }
+.connect-shield.large { width: 46px; height: 50px; border-width: 3px; }
+.connect-shield.large i { width: 12px; height: 8px; border-width: 0 0 3px 3px; }
+
+.cloud-connect-provider-row {
+  width: min(1180px, calc(100% - 36px));
+  margin: 18px auto 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.cloud-connect-provider-row button { min-height: 62px; padding: 9px 12px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--hairline); border-radius: 12px; background: var(--panel); color: var(--text); text-align: left; transition: border-color 180ms ease, background 180ms ease; }
+.cloud-connect-provider-row button.active { border-color: color-mix(in srgb, #22d3ee 60%, var(--hairline)); background: color-mix(in srgb, #22d3ee 8%, var(--panel)); box-shadow: inset 3px 0 #22d3ee; }
+.cloud-connect-provider-row button.planned { opacity: .56; cursor: not-allowed; }
+.connect-provider-mark { width: 29px; height: 29px; flex: 0 0 auto; color: var(--provider-accent); }
+.cloud-connect-provider-row span { min-width: 0; display: grid; gap: 3px; }
+.cloud-connect-provider-row strong { font-size: 10px; }
+.cloud-connect-provider-row small { color: var(--text-faint); font-size: 8px; }
+
+.cloud-connect-setup,
+.cloud-connect-result { width: min(1180px, calc(100% - 36px)); margin: 14px auto 36px; }
+.cloud-connect-setup { display: grid; grid-template-columns: .76fr 1.24fr; gap: 14px; align-items: start; }
+
+.cloud-connect-intro,
+.cloud-connect-form,
+.connect-result-hero,
+.connect-result-metrics article,
+.connect-ready-card,
+.connect-packet-card,
+.connect-safety-review { border: 1px solid var(--hairline); border-radius: 16px; background: color-mix(in srgb, var(--panel) 96%, transparent); box-shadow: 0 16px 44px rgba(10, 15, 28, .08); }
+.cloud-connect-intro { min-height: 620px; padding: clamp(26px, 4vw, 46px); display: flex; flex-direction: column; justify-content: center; position: sticky; top: 14px; overflow: hidden; }
+.cloud-connect-intro::before { content: ""; width: 260px; height: 260px; position: absolute; left: -110px; top: -100px; border-radius: 50%; background: color-mix(in srgb, #22d3ee 15%, transparent); filter: blur(22px); pointer-events: none; }
+.cloud-connect-intro .eyebrow { position: relative; color: #0891b2; font-size: 8px; font-weight: 850; letter-spacing: .14em; }
+:root[data-theme="dark"] .cloud-connect-intro .eyebrow { color: #67e8f9; }
+.cloud-connect-intro h3 { max-width: 560px; margin: 18px 0 14px; position: relative; font: 760 clamp(30px, 4vw, 46px)/1.03 "Space Grotesk", "Segoe UI", sans-serif; letter-spacing: -.045em; }
+.cloud-connect-intro > p { margin: 0; position: relative; color: var(--text-muted); font-size: 12px; line-height: 1.7; }
+.connect-trust-flow { margin: 28px 0; display: flex; align-items: center; gap: 7px; }
+.connect-trust-flow span { min-height: 61px; flex: 1; padding: 10px; display: grid; align-content: center; gap: 4px; border: 1px solid color-mix(in srgb, #22d3ee 24%, var(--hairline)); border-radius: 10px; background: color-mix(in srgb, #22d3ee 5%, var(--panel-2)); color: var(--text-muted); font-size: 8px; line-height: 1.35; }
+.connect-trust-flow b { color: #0891b2; font: 750 12px ui-monospace, monospace; }
+.connect-trust-flow > i { color: #0891b2; font-size: 14px; font-style: normal; }
+.connect-boundary-card { padding: 14px; display: flex; gap: 12px; border: 1px solid color-mix(in srgb, #f59e0b 28%, var(--hairline)); border-radius: 12px; background: color-mix(in srgb, #f59e0b 6%, var(--panel-2)); }
+.boundary-mark { width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid color-mix(in srgb, #f59e0b 60%, var(--hairline)); border-radius: 50%; color: #d97706; }
+.boundary-mark::before { content: "i"; font: 800 13px Georgia, serif; }
+.connect-boundary-card strong { font-size: 10px; }
+.connect-boundary-card p { margin: 4px 0 0; color: var(--text-muted); font-size: 9px; line-height: 1.55; }
+
+.cloud-connect-form { overflow: hidden; }
+.cloud-connect-form > header { min-height: 70px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--hairline); }
+.cloud-connect-form > header span { display: grid; gap: 4px; }
+.cloud-connect-form > header small { color: #0891b2; font-size: 8px; font-weight: 850; letter-spacing: .12em; }
+.cloud-connect-form > header strong { font-size: 14px; }
+.connect-form-provider { width: 34px; height: 34px; color: var(--provider-accent); }
+.connect-form-section { padding: 18px; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 13px; border-bottom: 1px solid var(--hairline); }
+.connect-section-number { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid color-mix(in srgb, #22d3ee 42%, var(--hairline)); border-radius: 9px; background: color-mix(in srgb, #22d3ee 8%, var(--panel-2)); color: #0891b2; font: 780 10px ui-monospace, monospace; }
+.connect-section-fields { min-width: 0; display: grid; gap: 11px; }
+.connect-section-fields > strong { margin-bottom: 2px; font-size: 11px; }
+.connect-section-fields label { min-width: 0; display: grid; gap: 5px; color: var(--text-muted); font-size: 9px; font-weight: 690; }
+.connect-section-fields input,
+.connect-section-fields select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--hairline-strong); border-radius: 9px; background: var(--panel-2); color: var(--text); font: 500 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.connect-section-fields input:focus,
+.connect-section-fields select:focus { outline: 3px solid color-mix(in srgb, #22d3ee 20%, transparent); border-color: #0891b2; }
+.connect-section-fields label > small { color: var(--text-faint); font-size: 8px; font-weight: 500; line-height: 1.45; }
+.connect-section-fields .connect-field-error { color: var(--danger); font-weight: 670; }
+.connect-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.connect-validation-summary { margin: 14px 18px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--danger) 36%, var(--hairline)); border-radius: 10px; background: color-mix(in srgb, var(--danger) 7%, var(--panel-2)); }
+.connect-validation-summary strong { color: var(--danger); font-size: 10px; }
+.connect-validation-summary p { margin: 4px 0 0; color: var(--text-muted); font-size: 8.5px; }
+.cloud-connect-form > footer { padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cloud-connect-form > footer > span { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 8.5px; }
+.cloud-connect-form > footer > span i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.connect-prepare-button,
+.connect-download-button { min-height: 46px; padding: 0 18px; border: 1px solid #0891b2; border-radius: 10px; background: linear-gradient(135deg, #0891b2, #2563eb); color: white; font-size: 10px; font-weight: 780; box-shadow: 0 10px 28px rgba(8, 145, 178, .24); }
+.connect-prepare-button:hover:not(:disabled),
+.connect-download-button:hover { box-shadow: 0 14px 34px rgba(8, 145, 178, .32); }
+.connect-prepare-button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.connect-prepare-button span { margin-left: 8px; font-size: 15px; }
+
+.cloud-connect-result { display: grid; gap: 12px; }
+.connect-result-hero { min-height: 132px; padding: 24px; display: flex; align-items: center; justify-content: space-between; overflow: hidden; position: relative; border-color: color-mix(in srgb, var(--provider-accent) 34%, var(--hairline)); background: radial-gradient(circle at 88% 30%, color-mix(in srgb, var(--provider-accent) 17%, transparent), transparent 30%), var(--panel); }
+.connect-result-hero > div { display: flex; align-items: center; gap: 16px; }
+.prepared-mark { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--ok) 52%, var(--hairline)); border-radius: 50%; background: color-mix(in srgb, var(--ok) 10%, var(--panel-2)); box-shadow: 0 0 24px color-mix(in srgb, var(--ok) 18%, transparent); }
+.prepared-mark i { width: 17px; height: 9px; border-left: 3px solid var(--ok); border-bottom: 3px solid var(--ok); transform: rotate(-45deg); }
+.connect-result-hero small { color: var(--ok); font-size: 8px; font-weight: 850; letter-spacing: .13em; }
+.connect-result-hero h3 { margin: 4px 0; font: 760 25px "Space Grotesk", sans-serif; letter-spacing: -.035em; }
+.connect-result-hero p { margin: 0; color: var(--text-muted); font-size: 10px; }
+.connect-result-provider { width: 62px; height: 62px; color: var(--provider-accent); }
+.connect-result-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.connect-result-metrics article { min-height: 104px; padding: 16px; display: grid; align-content: center; gap: 4px; }
+.connect-result-metrics small { color: var(--text-faint); font-size: 7.5px; font-weight: 830; letter-spacing: .11em; }
+.connect-result-metrics strong { font: 750 19px "Space Grotesk", sans-serif; }
+.connect-result-metrics span { overflow: hidden; color: var(--text-muted); font-size: 8.5px; text-overflow: ellipsis; white-space: nowrap; }
+.connect-result-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 12px; }
+.connect-ready-card,
+.connect-packet-card { overflow: hidden; }
+.connect-ready-card > header,
+.connect-packet-card > header { min-height: 62px; padding: 13px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--hairline); }
+.connect-ready-card header span,
+.connect-packet-card header span { display: grid; gap: 3px; }
+.connect-ready-card header small,
+.connect-packet-card header small { color: #0891b2; font-size: 7.5px; font-weight: 830; letter-spacing: .12em; }
+.connect-ready-card header strong,
+.connect-packet-card header strong { font-size: 12px; }
+.connect-ready-card header b { padding: 5px 8px; border-radius: 999px; background: color-mix(in srgb, #f59e0b 11%, var(--panel-2)); color: #d97706; font-size: 7px; letter-spacing: .09em; }
+.connect-packet-card header b { color: var(--text-faint); font-size: 8px; }
+.connect-ready-card ol { margin: 0; padding: 13px; display: grid; gap: 8px; list-style: none; }
+.connect-ready-card li { padding: 12px; display: grid; grid-template-columns: 34px 1fr; gap: 11px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--panel-2); }
+.connect-ready-card li > span { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 9px; background: color-mix(in srgb, #22d3ee 10%, var(--panel)); color: #0891b2; font: 760 10px ui-monospace, monospace; }
+.connect-ready-card p { margin: 0; }
+.connect-ready-card p strong,
+.connect-ready-card p small { display: block; }
+.connect-ready-card p strong { font-size: 10px; }
+.connect-ready-card p small { margin-top: 4px; color: var(--text-muted); font-size: 8.5px; line-height: 1.5; }
+.connect-packet-card ul { max-height: 260px; margin: 0; padding: 12px; display: grid; gap: 5px; overflow: auto; list-style: none; }
+.connect-packet-card li { min-height: 35px; padding: 6px 8px; display: flex; align-items: center; gap: 9px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--panel-2); font: 550 9px ui-monospace, monospace; }
+.connect-packet-card li span { min-width: 28px; padding: 4px; border-radius: 5px; background: color-mix(in srgb, #22d3ee 11%, var(--panel)); color: #0891b2; font-size: 7px; text-align: center; }
+.connect-download-button,
+.connect-copy-button { width: calc(100% - 24px); margin: 0 12px 8px; }
+.connect-copy-button { min-height: 41px; border: 1px solid var(--hairline-strong); border-radius: 9px; background: var(--panel-2); color: var(--text); font-size: 9px; font-weight: 720; }
+.connect-safety-review { padding: 22px; display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 18px; border-color: color-mix(in srgb, var(--ok) 28%, var(--hairline)); background: color-mix(in srgb, var(--ok) 5%, var(--panel)); }
+.connect-safety-review small { color: var(--ok); font-size: 7.5px; font-weight: 840; letter-spacing: .12em; }
+.connect-safety-review h3 { margin: 5px 0 8px; font: 740 18px "Space Grotesk", sans-serif; }
+.connect-safety-review ul { margin: 0; padding-left: 17px; color: var(--text-muted); font-size: 8.7px; line-height: 1.65; }
+.connect-safety-review a { min-height: 42px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--hairline)); border-radius: 9px; color: color-mix(in srgb, var(--ok) 70%, var(--text)); font-size: 8.5px; font-weight: 730; text-decoration: none; }
+.connect-safety-review a:hover { background: color-mix(in srgb, var(--ok) 8%, var(--panel-2)); }
+
+.cloud-connect-page button { cursor: pointer; }
+.cloud-connect-page button:focus-visible,
+.cloud-connect-page a:focus-visible { outline: 3px solid color-mix(in srgb, #22d3ee 26%, transparent); outline-offset: 2px; }
+
 /* --- responsive ----------------------------------------------------------- */
+
+@media (max-width: 1400px) {
+  .builder-nav-button,
+  .drift-nav-button,
+  .statelens-nav-button,
+  .ai-nav-button,
+  .cloud-connect-nav-button {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .drift-nav-button b,
+  .statelens-nav-button b {
+    position: absolute;
+    margin: -25px -24px 0 0;
+    font-size: 8px;
+  }
+}
 
 @media (max-width: 900px) {
   .minimap,
@@ -2728,6 +3030,20 @@ body {
     font-size: 0;
   }
 
+  .cloud-connect-nav-button {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .cloud-connect-provider-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cloud-connect-setup { grid-template-columns: 1fr; }
+  .cloud-connect-intro { min-height: auto; position: static; }
+  .connect-result-grid { grid-template-columns: 1fr; }
+  .connect-safety-review { grid-template-columns: 52px minmax(0, 1fr); }
+  .connect-safety-review a { grid-column: 2; justify-self: start; }
+
   .ai-prompt-layout { grid-template-columns: 1fr; overflow-y: auto; max-height: calc(100vh - 110px); }
   .ai-prompt-copy { padding: 28px; border-right: 0; border-bottom: 1px solid var(--hairline); }
   .ai-prompt-copy h2 { font-size: 34px; }
@@ -2786,6 +3102,30 @@ body {
   .welcome-feature-card { min-height: 122px; padding: 14px; }
   .welcome-feature-divider { margin-top: 4px; }
 
+  .cloud-connect-header { align-items: flex-start; padding: 12px; }
+  .cloud-connect-header .ghost-button { display: none; }
+  .cloud-connect-header h2 { font-size: 16px; }
+  .connection-safety-pill { min-height: 38px; padding: 0 9px; font-size: 0; }
+  .cloud-connect-security-strip { padding: 10px 14px; align-items: flex-start; }
+  .cloud-connect-provider-row,
+  .cloud-connect-setup,
+  .cloud-connect-result { width: calc(100% - 20px); margin-top: 10px; }
+  .cloud-connect-provider-row { grid-template-columns: 1fr 1fr; }
+  .cloud-connect-provider-row button { min-height: 58px; padding: 8px; }
+  .cloud-connect-intro { padding: 24px; }
+  .cloud-connect-intro h3 { font-size: 30px; }
+  .connect-trust-flow { align-items: stretch; flex-direction: column; }
+  .connect-trust-flow > i { display: none; }
+  .connect-field-grid { grid-template-columns: 1fr; }
+  .connect-form-section { padding: 15px; grid-template-columns: 32px minmax(0, 1fr); gap: 9px; }
+  .cloud-connect-form > footer { align-items: stretch; flex-direction: column; }
+  .connect-prepare-button { width: 100%; }
+  .connect-result-hero { align-items: flex-start; padding: 18px; }
+  .connect-result-provider { width: 44px; height: 44px; }
+  .connect-result-metrics { grid-template-columns: repeat(2, 1fr); }
+  .connect-safety-review { padding: 17px; grid-template-columns: 1fr; }
+  .connect-safety-review a { grid-column: 1; }
+
   .statelens-header { align-items: flex-start; padding: 12px; }
   .statelens-header .ghost-button { display: none; }
   .statelens-header h2 { font-size: 16px; }
@@ -2835,7 +3175,9 @@ body {
   }
 
   .ai-spinner,
-  .edge-layer .edge.selected .edge-line {
+  .edge-layer .edge.selected .edge-line,
+  .cloud-connect-page * {
     animation: none;
+    transition-duration: 0.01ms !important;
   }
 }

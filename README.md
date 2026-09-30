@@ -175,6 +175,24 @@ and StateLens excludes Terraform-sensitive attributes plus credential-shaped pro
 passwords, tokens, access keys, and private keys. The resulting non-secret configuration remains
 fully editable in the normal resource inspector.
 
+## Secure Cloud Connect — short-lived identity without access keys
+
+Open **Connect** to prepare a reviewable AWS OIDC trust packet for infrastructure inventory.
+InfraCanvas asks only for non-secret identity metadata—the target account, exact issuer, subject,
+audience, regions, and session lifetime—and refuses wildcard trust or credential-shaped input.
+
+The downloaded packet contains Terraform, an exact web-identity trust policy, a bounded read-only
+inventory policy, and a session-only connection manifest. It intentionally excludes secret-value
+and object-value APIs such as `secretsmanager:GetSecretValue`, `ssm:GetParameter`, and
+`s3:GetObject`.
+
+This first vertical slice prepares the AWS trust boundary; it does **not** claim that the browser is
+connected. InfraCanvas remains a browser-only application and does not exchange tokens or call AWS.
+A separately deployed, trusted OIDC broker is required to request the temporary AWS STS session.
+Azure, Google Cloud, and OCI federation packets remain planned follow-up slices.
+
+The model follows the provider guidance for [AWS STS web identity federation](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html).
+
 ## Verified, not just "generated"
 
 The generator has a test suite that puts **every service in every provider's catalog** on a
