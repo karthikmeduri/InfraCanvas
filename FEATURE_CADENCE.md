@@ -9,7 +9,7 @@ production-quality vertical slice with the remaining boundary documented.
 | --- | --- | --- | --- | --- |
 | 1 | Architecture Pull Requests / Change Intelligence | Complete · awaiting review | `codex/feature-change-intelligence` · [PR #6](https://github.com/karthikmeduri/InfraCanvas/pull/6) | Typecheck, lint, tests, build, security review, and four-provider OpenTofu validation passed in GitHub Actions. One root architecture snapshot per repository. |
 | 2 | Four-way Reconciliation Center | Complete · awaiting review | `codex/feature-reconciliation-center` · [PR #7](https://github.com/karthikmeduri/InfraCanvas/pull/7) | Read-only comparison across canvas, generated IaC, imported state, and imported TFwhy live evidence. All GitHub CI checks passed. |
-| 3 | Secure cloud connection using short-lived identity | In progress | `codex/feature-secure-cloud-connection` | AWS OIDC onboarding slice: exact identity trust, session-only metadata, and validated read-only Terraform setup packet. No live broker or cloud call. |
+| 3 | Secure cloud connection using short-lived identity | Complete · awaiting review | `codex/feature-secure-cloud-connection` · [PR #8](https://github.com/karthikmeduri/InfraCanvas/pull/8) | AWS OIDC onboarding slice: exact identity trust, session-only metadata, and validated read-only Terraform setup packet. No live broker or cloud call. |
 | 4 | Cost and security overlays | Next | — | Canvas and PR-level impact views. |
 | 5 | Shareable diagrams and production template gallery | Planned | — | — |
 | 6 | Team workspaces and review collaboration | Planned | — | — |
@@ -41,5 +41,5 @@ production-quality vertical slice with the remaining boundary documented.
 - Honest boundary: this slice prepares trust only. A separately deployed, audited OIDC broker is
   still required for token exchange and live inventory. Azure, Google Cloud, and OCI federation
   packets are not included in this slice.
-- Pull request: pending.
+- Pull request: [#8](https://github.com/karthikmeduri/InfraCanvas/pull/8)
 - Next: cost and security overlays.
