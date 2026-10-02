@@ -8,7 +8,7 @@ and are never merged or deployed by the cadence automation.
 | 1 | Architecture Pull Requests / Change Intelligence | Review ready | `codex/feature-change-intelligence` · [PR #6](https://github.com/karthikmeduri/InfraCanvas/pull/6) | CI green. Review and merge remain human-controlled. |
 | 2 | Four-way Reconciliation Center | Review ready | `codex/feature-reconciliation-center` · [PR #7](https://github.com/karthikmeduri/InfraCanvas/pull/7) | CI green. Shipped as an honest local comparison slice. |
 | 3 | Secure cloud connection | Review ready | `codex/feature-secure-cloud-connection` · [PR #8](https://github.com/karthikmeduri/InfraCanvas/pull/8) | CI green. AWS short-lived OIDC onboarding; no long-lived credentials. |
-| 4 | Cost and security overlays | Implemented in this branch | `codex/feature-cost-security-overlays` · PR pending | 46 generator/security tests + 4 rendered tests pass. Broad planning bands, not live prices; static checks, not certification. |
+| 4 | Cost and security overlays | Review ready | `codex/feature-cost-security-overlays` · [PR #9](https://github.com/karthikmeduri/InfraCanvas/pull/9) | 46 generator/security tests + 4 rendered tests pass. Broad planning bands, not live prices; static checks, not certification. |
 | 5 | Shareable diagrams + production template gallery | Next | — | Must exclude secrets and preserve safe defaults. |
 | 6 | Team workspaces and review collaboration | Planned | — | — |
 | 7 | Reusable versioned architecture components | Planned | — | — |
