@@ -21,6 +21,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [x] TFwhy drift reports mapped to affected canvas resources
 - [x] SVG, PNG, JSON, Terraform, and Pulumi project exports
 - [x] Secure production-scale example architectures for every supported provider
+- [x] Local cost planning ranges and security configuration overlays with explicit assumptions
 
 ## Next: close the reconciliation loop
 
@@ -28,7 +29,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [ ] Let users choose the desired source of truth for each detected difference
 - [ ] Generate a reviewable correction without silently changing the canvas or cloud
 - [ ] Add nested VPC, VNet, and VCN boundary groups
-- [ ] Add cost estimates with region, size, and usage assumptions shown explicitly
+- [x] Add cost estimates with scale and capacity assumptions shown explicitly
 - [ ] Generate reusable module boundaries instead of only flat resource sets
 - [ ] Add architecture version diffs that explain nodes, connections, and configuration changes
 
@@ -39,7 +40,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [ ] Review-gated deployment using short-lived cloud credentials
 - [ ] Plan-before-apply, explicit approval, audit history, and cancellation controls
 - [ ] Team workspaces, comments, saved versions, and architecture approval roles
-- [ ] Policy packs for public exposure, encryption, backups, identity, and resilience
+- [ ] Expand the shipped baseline checks into organization-managed policy packs
 - [ ] Shareable read-only architecture links with secrets excluded
 
 ## Deployment safety requirements

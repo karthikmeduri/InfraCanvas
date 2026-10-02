@@ -28,6 +28,7 @@ import {
 } from "@/lib/ai-architect";
 import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
 import { StateLensWorkspace, type LoadedState } from "@/app/components/StateLensWorkspace";
+import { OverlayWorkspace } from "@/app/components/OverlayWorkspace";
 import {
   canvasTerraformResources,
   highestDriftSeverity,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/drift";
 import { diagramToSvg, svgToPngBlob } from "@/lib/export-diagram";
 import { removeDiagramEdge } from "@/lib/diagram";
+import { analyzeArchitecture } from "@/lib/overlays";
 import { safeName } from "@/lib/hcl";
 import { HighlightedCode } from "@/lib/highlight";
 import { ProviderMark, ServiceArtwork } from "@/lib/icons";
@@ -162,6 +164,7 @@ export default function Home() {
   const [stateLensOpen, setStateLensOpen] = useState(false);
   const [stateLensImport, setStateLensImport] = useState<LoadedState | null>(null);
   const [stateLensError, setStateLensError] = useState("");
+  const [overlaysOpen, setOverlaysOpen] = useState(false);
   const [welcomeFeature, setWelcomeFeature] = useState<"statelens" | "drift" | null>(null);
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -231,6 +234,7 @@ export default function Home() {
   const pulumiGenerated = generatePulumi(provider, generated, projectName);
   const activeGenerated = iacTarget === "terraform" ? generated : pulumiGenerated;
   const issues = validateDiagram(provider, nodes, edges);
+  const architectureOverlay = analyzeArchitecture(provider, nodes, edges);
   const errorCount = issues.filter((issue) => issue.severity === "error").length;
   const warningCount = issues.filter((issue) => issue.severity === "warning").length;
   const driftMatches = driftReport
@@ -323,6 +327,7 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setOverlaysOpen(false);
     if (welcomeFeature) setProviderPickerOpen(true);
     setWelcomeFeature(null);
   };
@@ -332,6 +337,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setStateLensOpen(false);
+    setOverlaysOpen(false);
     setDriftOpen(true);
     if (fromWelcome) setWelcomeFeature("drift");
   };
@@ -341,6 +347,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
+    setOverlaysOpen(false);
     setStateLensOpen(true);
     if (fromWelcome) setWelcomeFeature("statelens");
   };
@@ -350,6 +357,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setOverlaysOpen(false);
     setCodeOpen(true);
   };
 
@@ -358,10 +366,20 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setOverlaysOpen(false);
     setExamplePromptOpen(false);
     setAiPlan(null);
     setAiError("");
     setAiArchitectOpen(true);
+  };
+
+  const showOverlays = () => {
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setAiArchitectOpen(false);
+    setOverlaysOpen(true);
   };
 
   const requestAiArchitecture = async () => {
@@ -1090,6 +1108,15 @@ export default function Home() {
     });
   };
 
+  const focusOverlayNode = (nodeId: string) => {
+    setOverlaysOpen(false);
+    setWelcomeFeature(null);
+    setProviderPickerOpen(false);
+    setSelection([nodeId]);
+    setSelectedEdgeId(null);
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => revealNode(nodeId)));
+  };
+
   const focusValidationIssue = (issue: ValidationIssue) => {
     setIssuesOpen(true);
     setActiveIssueId(issue.id);
@@ -1698,9 +1725,9 @@ export default function Home() {
             Save
           </button>
           <button
-            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen ? "active" : ""}`}
+            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen && !overlaysOpen ? "active" : ""}`}
             onClick={showBuilder}
-            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen}
+            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen && !overlaysOpen}
             title="Return to the architecture builder"
           >
             <span className="builder-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
@@ -1734,6 +1761,16 @@ export default function Home() {
           >
             <span className="ai-nav-icon" aria-hidden="true"><i /><i /><i /></span>
             AI Architect
+          </button>
+          <button
+            className={`overlay-nav-button ${overlaysOpen ? "active" : ""}`}
+            onClick={showOverlays}
+            aria-pressed={overlaysOpen}
+            title="Review local cost ranges and security configuration findings"
+          >
+            <span className="overlay-nav-icon" aria-hidden="true"><i /><i /><i /></span>
+            Insights
+            {architectureOverlay.security.findings.length > 0 && <b>{architectureOverlay.security.findings.length}</b>}
           </button>
           <button
             className={`generate-button ${codeOpen ? "active" : ""}`}
@@ -1806,7 +1843,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!codeOpen && !driftOpen && !stateLensOpen && (
+      {!codeOpen && !driftOpen && !stateLensOpen && !overlaysOpen && (
         <section
           className="workspace"
           style={{ "--provider-accent": provider.accent } as CSSProperties}
@@ -3263,6 +3300,15 @@ export default function Home() {
           onClear={clearDriftReport}
           onFocusNode={focusDriftNode}
           onCopy={copyText}
+        />
+      )}
+
+      {overlaysOpen && (
+        <OverlayWorkspace
+          provider={provider}
+          overlay={architectureOverlay}
+          onBack={showBuilder}
+          onFocusNode={focusOverlayNode}
         />
       )}
 

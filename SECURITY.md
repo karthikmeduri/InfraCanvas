@@ -15,6 +15,18 @@ issue. We aim to acknowledge within a few days.
 - **The app never asks for cloud credentials** and has no code path that sends a request to
   a cloud provider. It generates text; you run Terraform yourself.
 
+## Cost and security overlay boundary
+
+The Insights workspace analyzes the in-memory canvas only. Before analysis it removes properties
+whose names look like passwords, tokens, credentials, access keys, private keys, or client
+secrets. The analysis is deterministic, does not call cloud or billing APIs, is not written to
+storage, and introduces no telemetry. Automated tests assert that credential-shaped values cannot
+appear in the overlay output and that the input diagram is not mutated.
+
+Findings cover a bounded set of configuration patterns. A clean result does not prove that the
+deployed infrastructure is secure, vulnerability-free, or compliant. Cost bands are planning
+heuristics rather than live prices or billing forecasts.
+
 ## How generated Terraform handles secrets
 
 Credentials are never written into the generated configuration as literals. Anything
