@@ -157,6 +157,27 @@ cp .env.example .env.local
 Without an API key, the same workflow remains testable with a clearly labeled, deterministic local
 catalog draft. The UI never presents that fallback as an AI model response.
 
+## Cost & security insights — before deployment
+
+Open **Insights** from any architecture to review two local overlays in one workspace:
+
+- a broad monthly planning range for each deployable resource, adjusted by configured scale and
+  capacity signals; and
+- deterministic configuration findings for public exposure, plaintext listeners, encryption,
+  backups, resilience, cluster endpoints, registry scanning, and monitoring.
+
+Every finding can locate its resource on the canvas. Filters use explicit severity labels in
+addition to color, and the responsive workspace supports both light and dark themes. Credential-
+shaped fields are removed before analysis, no cloud or billing account is contacted, and the
+result is not persisted.
+
+![InfraCanvas cost and security insights dashboard](docs/images/infracanvas-cost-security-insights.png)
+
+The cost range is deliberately an **estimate, not a quote**. It excludes region-specific pricing,
+request volume, data egress, discounts, taxes, and support. Use the official provider calculator
+linked from the workspace before making a purchasing decision. The security score is a planning
+signal, not a vulnerability scan or compliance certification.
+
 ## StateLens — state to architecture
 
 Click **StateLens** to reveal the editable architecture hidden inside existing infrastructure

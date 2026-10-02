@@ -16,6 +16,7 @@ export {
   planNodeDefaults,
 } from "../../lib/ai-architect";
 export { removeDiagramEdge } from "../../lib/diagram";
+export { analyzeArchitecture } from "../../lib/overlays";
 export {
   canvasTerraformResources,
   highestDriftSeverity,
