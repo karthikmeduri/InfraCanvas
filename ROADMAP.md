@@ -40,7 +40,8 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [ ] Plan-before-apply, explicit approval, audit history, and cancellation controls
 - [ ] Team workspaces, comments, saved versions, and architecture approval roles
 - [ ] Policy packs for public exposure, encryption, backups, identity, and resilience
-- [ ] Shareable read-only architecture links with secrets excluded
+- [x] Shareable architecture snapshots with catalog allowlisting, credential-key exclusion, and confirm-before-open import
+- [x] Reviewed production template gallery for AWS, Azure, Google Cloud, and OCI
 
 ## Deployment safety requirements
 

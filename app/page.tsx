@@ -27,7 +27,9 @@ import {
   type ArchitecturePlan,
 } from "@/lib/ai-architect";
 import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
+import { ShareDiagramDialog } from "@/app/components/ShareDiagramDialog";
 import { StateLensWorkspace, type LoadedState } from "@/app/components/StateLensWorkspace";
+import { TemplateGallery } from "@/app/components/TemplateGallery";
 import {
   canvasTerraformResources,
   highestDriftSeverity,
@@ -43,6 +45,8 @@ import { ProviderMark, ServiceArtwork } from "@/lib/icons";
 import { generatePulumi } from "@/lib/pulumi/generate";
 import { generate } from "@/lib/terraform/generate";
 import { parseStateFile } from "@/lib/state-lens";
+import { decodeSharedDiagram, encodeSharedDiagram, type ShareDecodeResult } from "@/lib/share-diagram";
+import { instantiateProductionTemplate, productionTemplateById } from "@/lib/templates";
 import type {
   DiagramEdge,
   DiagramNode,
@@ -168,6 +172,13 @@ export default function Home() {
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
   const [examplePromptOpen, setExamplePromptOpen] = useState(false);
   const [aiArchitectOpen, setAiArchitectOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareError, setShareError] = useState("");
+  const [sharedImport, setSharedImport] = useState<ShareDecodeResult | null>(null);
+  const [shareImportError, setShareImportError] = useState("");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiPlan, setAiPlan] = useState<ArchitecturePlan | null>(null);
   const [aiPlanning, setAiPlanning] = useState(false);
@@ -320,6 +331,7 @@ export default function Home() {
 
   const showBuilder = () => {
     setAiArchitectOpen(false);
+    setTemplatesOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
@@ -329,6 +341,7 @@ export default function Home() {
 
   const showDrift = (fromWelcome = false) => {
     setAiArchitectOpen(false);
+    setTemplatesOpen(false);
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setStateLensOpen(false);
@@ -338,6 +351,7 @@ export default function Home() {
 
   const showStateLens = (fromWelcome = false) => {
     setAiArchitectOpen(false);
+    setTemplatesOpen(false);
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
@@ -347,6 +361,7 @@ export default function Home() {
 
   const showGeneratedCode = () => {
     setAiArchitectOpen(false);
+    setTemplatesOpen(false);
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
@@ -354,6 +369,7 @@ export default function Home() {
   };
 
   const showAiArchitect = () => {
+    setTemplatesOpen(false);
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
@@ -362,6 +378,28 @@ export default function Home() {
     setAiPlan(null);
     setAiError("");
     setAiArchitectOpen(true);
+  };
+
+  const showTemplates = () => {
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setAiArchitectOpen(false);
+    setExamplePromptOpen(false);
+    setTemplatesOpen(true);
+  };
+
+  const openShareDialog = () => {
+    setShareOpen(true);
+    setShareUrl("");
+    setShareError("");
+    try {
+      const fragment = encodeSharedDiagram({ providerId, projectName, nodes, edges });
+      setShareUrl(`${window.location.origin}${window.location.pathname}${fragment}`);
+    } catch (error) {
+      setShareError(error instanceof Error ? error.message : "InfraCanvas could not create this share link.");
+    }
   };
 
   const requestAiArchitecture = async () => {
@@ -558,6 +596,25 @@ export default function Home() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
+    const inspectShareFragment = () => {
+      if (!window.location.hash.startsWith("#share=")) return;
+      try {
+        setSharedImport(decodeSharedDiagram(window.location.hash));
+        setShareImportError("");
+      } catch (error) {
+        setSharedImport(null);
+        setShareImportError(error instanceof Error ? error.message : "This share link could not be opened.");
+      }
+      setProviderPickerOpen(false);
+      setShareOpen(false);
+      setTemplatesOpen(false);
+    };
+    inspectShareFragment();
+    window.addEventListener("hashchange", inspectShareFragment);
+    return () => window.removeEventListener("hashchange", inspectShareFragment);
+  }, []);
+
+  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(""), 2600);
     return () => window.clearTimeout(timer);
@@ -724,6 +781,96 @@ export default function Home() {
       notify(`Secure ${definition.shortName} production reference architecture loaded`);
     };
 
+  const fitImportedGraph = (graphNodes: DiagramNode[]) => {
+    if (graphNodes.length === 0) return;
+    window.requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const minX = Math.min(...graphNodes.map((node) => node.x));
+      const minY = Math.min(...graphNodes.map((node) => node.y));
+      const maxX = Math.max(...graphNodes.map((node) => node.x + NODE_WIDTH));
+      const maxY = Math.max(...graphNodes.map((node) => node.y + NODE_HEIGHT));
+      const nextZoom = clamp(
+        Math.min(
+          (canvas.clientWidth - 80) / Math.max(1, maxX - minX),
+          (canvas.clientHeight - 100) / Math.max(1, maxY - minY),
+        ),
+        0.35,
+        0.9,
+      );
+      setZoom(nextZoom);
+      window.requestAnimationFrame(() => {
+        canvas.scrollTo({
+          left: Math.max(0, ((minX + maxX) / 2) * nextZoom - canvas.clientWidth / 2),
+          top: Math.max(0, ((minY + maxY) / 2) * nextZoom - canvas.clientHeight / 2),
+          behavior: "smooth",
+        });
+      });
+    });
+  };
+
+  const applyProductionTemplate = (templateId: string) => {
+    const template = productionTemplateById(templateId);
+    if (!template) return;
+    const diagram = instantiateProductionTemplate(templateId, nextId);
+    setProviderId(diagram.providerId);
+    setCollapsedCategories(collapsedCatalogCategories(diagram.providerId));
+    setProjectName(diagram.projectName);
+    setSearch("");
+    setCatalogFilter("all");
+    commit(() => ({ nodes: diagram.nodes, edges: diagram.edges }));
+    const loadBalancer = diagram.nodes.find((node) =>
+      ["alb", "app_gateway", "load_balancer"].includes(node.serviceId),
+    );
+    setSelection(loadBalancer ? [loadBalancer.id] : diagram.nodes[0] ? [diagram.nodes[0].id] : []);
+    setSelectedEdgeId(null);
+    setTemplatesOpen(false);
+    setProviderPickerOpen(false);
+    setExamplePromptOpen(false);
+    setPendingTemplateId(null);
+    setWelcomeFeature(null);
+    fitImportedGraph(diagram.nodes);
+    notify(`${template.name} opened as an editable architecture`);
+  };
+
+  const requestProductionTemplate = (templateId: string) => {
+    if (nodes.length > 0) {
+      setPendingTemplateId(templateId);
+      return;
+    }
+    applyProductionTemplate(templateId);
+  };
+
+  const clearShareFragment = (returnToWelcome = false) => {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    setSharedImport(null);
+    setShareImportError("");
+    if (returnToWelcome && nodes.length === 0) setProviderPickerOpen(true);
+  };
+
+  const openSharedDiagram = () => {
+    if (!sharedImport) return;
+    const diagram = sharedImport.diagram;
+    setProviderId(diagram.providerId);
+    setCollapsedCategories(collapsedCatalogCategories(diagram.providerId));
+    setProjectName(diagram.projectName);
+    commit(() => ({ nodes: diagram.nodes, edges: diagram.edges }));
+    setSelection([]);
+    setSelectedEdgeId(null);
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setAiArchitectOpen(false);
+    setTemplatesOpen(false);
+    setExamplePromptOpen(false);
+    setWelcomeFeature(null);
+    const omitted = sharedImport.omittedValues;
+    clearShareFragment(false);
+    fitImportedGraph(diagram.nodes);
+    notify(`Shared architecture opened${omitted > 0 ? ` · ${omitted} unsafe values omitted` : ""}`);
+  };
+
   const applyProvider =
     (nextId: ProviderId, withSample: boolean) => {
       const definition = providerById(nextId);
@@ -737,6 +884,7 @@ export default function Home() {
       setCodeOpen(false);
       setDriftOpen(false);
       setStateLensOpen(false);
+      setTemplatesOpen(false);
       setWelcomeFeature(null);
       setStateLensImport(null);
       setStateLensError("");
@@ -1698,9 +1846,9 @@ export default function Home() {
             Save
           </button>
           <button
-            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen ? "active" : ""}`}
+            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen && !templatesOpen ? "active" : ""}`}
             onClick={showBuilder}
-            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen}
+            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen && !templatesOpen}
             title="Return to the architecture builder"
           >
             <span className="builder-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
@@ -1734,6 +1882,15 @@ export default function Home() {
           >
             <span className="ai-nav-icon" aria-hidden="true"><i /><i /><i /></span>
             AI Architect
+          </button>
+          <button
+            className={`templates-nav-button ${templatesOpen ? "active" : ""}`}
+            onClick={showTemplates}
+            aria-pressed={templatesOpen}
+            title="Browse reviewed production architecture templates"
+          >
+            <span className="templates-nav-icon" aria-hidden="true"><i /><i /><i /></span>
+            Templates
           </button>
           <button
             className={`generate-button ${codeOpen ? "active" : ""}`}
@@ -1806,7 +1963,11 @@ export default function Home() {
         </div>
       </div>
 
-      {!codeOpen && !driftOpen && !stateLensOpen && (
+      {templatesOpen && (
+        <TemplateGallery providerId={providerId} onBack={showBuilder} onUse={requestProductionTemplate} />
+      )}
+
+      {!codeOpen && !driftOpen && !stateLensOpen && !templatesOpen && (
         <section
           className="workspace"
           style={{ "--provider-accent": provider.accent } as CSSProperties}
@@ -2051,6 +2212,15 @@ export default function Home() {
                 </>
               )}
               <span className="toolbar-divider" />
+              <button
+                className="share-canvas-tool"
+                onClick={openShareDialog}
+                disabled={nodes.length === 0}
+                title="Create a sanitized client-side share link"
+              >
+                <span aria-hidden="true">↗</span>
+                Share
+              </button>
               <button onClick={exportSvg} disabled={nodes.length === 0} title="Export diagram as SVG">
                 SVG
               </button>
@@ -2885,6 +3055,21 @@ export default function Home() {
                 <span className="welcome-feature-action">Open drift <i aria-hidden="true">→</i></span>
                 <span className="welcome-feature-glow" aria-hidden="true" />
               </button>
+              <button
+                className="welcome-feature-card templates-feature-card"
+                onClick={showTemplates}
+              >
+                <span className="welcome-feature-icon templates-welcome-icon" aria-hidden="true">
+                  <i /><i /><i />
+                </span>
+                <span className="welcome-feature-copy">
+                  <small>PRODUCTION STARTING POINTS</small>
+                  <strong>Browse templates</strong>
+                  <p>Open a reviewed multi-tier architecture for AWS, Azure, Google Cloud, or OCI.</p>
+                </span>
+                <span className="welcome-feature-action">Explore gallery <i aria-hidden="true">→</i></span>
+                <span className="welcome-feature-glow" aria-hidden="true" />
+              </button>
             </div>
             <div className="provider-modal-footer">
               <span>
@@ -3423,6 +3608,69 @@ export default function Home() {
             </footer>
           </section>
         </section>
+      )}
+
+      {pendingTemplateId && productionTemplateById(pendingTemplateId) && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="replace-template-title">
+            <h2 id="replace-template-title">Replace the current canvas?</h2>
+            <p>
+              Opening <strong>{productionTemplateById(pendingTemplateId)?.name}</strong> replaces the {nodes.length}{" "}
+              resources currently on the canvas. Undo will restore your existing diagram during this session.
+            </p>
+            <div className="confirm-actions">
+              <button onClick={() => setPendingTemplateId(null)}>Keep current canvas</button>
+              <button className="primary-small" onClick={() => applyProductionTemplate(pendingTemplateId)}>
+                Open template
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {(sharedImport || shareImportError) && (
+        <div className="modal-backdrop shared-import-backdrop" role="presentation">
+          <section className="confirm-modal shared-import-modal" role="dialog" aria-modal="true" aria-labelledby="shared-import-title">
+            <span className="shared-import-mark" aria-hidden="true"><i /><i /><i /></span>
+            <small>INFRACANVAS SHARE LINK</small>
+            <h2 id="shared-import-title">{shareImportError ? "This share link cannot be opened" : "Open shared architecture?"}</h2>
+            {shareImportError ? (
+              <p className="share-error" role="alert">{shareImportError}</p>
+            ) : sharedImport && (
+              <>
+                <p>A sanitized snapshot is ready. InfraCanvas will never replace your current canvas without confirmation.</p>
+                <div className="shared-import-summary" style={{ "--provider-accent": providerById(sharedImport.diagram.providerId).accent } as CSSProperties}>
+                  <ProviderMark provider={sharedImport.diagram.providerId} className="shared-import-provider" />
+                  <span>
+                    <strong>{sharedImport.diagram.projectName}</strong>
+                    <small>{providerById(sharedImport.diagram.providerId).shortName} · {sharedImport.diagram.nodes.length} resources · {sharedImport.diagram.edges.length} connections</small>
+                  </span>
+                </div>
+                {sharedImport.omittedValues > 0 && (
+                  <p className="shared-import-omitted">{sharedImport.omittedValues} unsafe or unknown values were omitted.</p>
+                )}
+              </>
+            )}
+            <div className="confirm-actions">
+              <button onClick={() => clearShareFragment(true)}>{shareImportError ? "Close" : "Not now"}</button>
+              {sharedImport && <button className="primary-small" onClick={openSharedDiagram}>Open shared diagram</button>}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {shareOpen && (
+        <ShareDiagramDialog
+          url={shareUrl}
+          error={shareError}
+          resources={nodes.length}
+          connections={edges.length}
+          onClose={() => setShareOpen(false)}
+          onCopy={() => void navigator.clipboard.writeText(shareUrl).then(
+            () => notify("Share link copied"),
+            () => notify("Copy failed — select the link and copy it manually"),
+          )}
+        />
       )}
 
       <div className={`toast ${toast ? "show" : ""}`} aria-live="polite">

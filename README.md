@@ -44,6 +44,8 @@ flowchart LR
 | A visual AWS, Azure, GCP, or OCI diagram | Complete Terraform modules and Pulumi TypeScript projects |
 | Terraform or Pulumi state | An editable architecture diagram through StateLens |
 | A TFwhy drift report | Drift findings mapped back to the affected canvas resources |
+| A reviewed production template | A configurable multi-tier graph for any supported cloud |
+| A sanitized InfraCanvas share link | A confirmed, editable architecture snapshot with no server upload |
 
 This is why InfraCanvas is **The Bidirectional IaC Workspace**: prompt-to-diagram,
 diagram-to-IaC, state-to-diagram, and drift-to-canvas live in one open-source application.
@@ -157,6 +159,20 @@ cp .env.example .env.local
 Without an API key, the same workflow remains testable with a clearly labeled, deterministic local
 catalog draft. The UI never presents that fallback as an AI model response.
 
+## Production templates and share links
+
+Open **Templates** from any workspace to browse reviewed multi-tier starting points for AWS,
+Azure, Google Cloud, and OCI. Each card previews the topology, workload, availability model,
+featured services, and graph size. Choosing a template creates a normal editable InfraCanvas
+diagram—nothing is deployed, and every environment-specific value still needs review.
+
+The canvas **Share** action creates a portable snapshot in the URL fragment. The encoder only
+includes catalog-defined configuration fields, removes credential-shaped and unknown keys, and
+caps resource, connection, text, and payload sizes. Opening a link always shows a confirmation
+before replacing existing work. The payload never goes to an InfraCanvas server, but the link is
+not encrypted and has no access control or revocation: anyone holding it can view the sanitized
+diagram. See [SECURITY.md](SECURITY.md#share-link-security-boundary) for the exact boundary.
+
 ## StateLens — state to architecture
 
 Click **StateLens** to reveal the editable architecture hidden inside existing infrastructure
@@ -234,6 +250,8 @@ also accept any region-supported custom instance type.
 
 - **Canvas** — drag, marquee-select, multi-drag, snap to grid, pan, `Ctrl`+scroll zoom,
   zoom-to-fit, minimap
+- **Templates** — four reviewed, provider-specific production topologies with visual previews
+- **Sharing** — confirm-before-open, browser-only architecture snapshots with field allowlisting
 - **History** — full undo/redo, with a drag counting as a single step
 - **Connections** — draw from either port, click-to-connect, select and delete edges,
   per-node connection list in the inspector
