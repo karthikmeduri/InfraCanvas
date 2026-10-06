@@ -28,4 +28,5 @@ Local verification passed: typecheck; clean lint; production build; 49 automated
 OpenTofu validation for AWS, Azure, GCP, and OCI; and desktop plus 375px browser QA. The
 repository's existing production dependency audit baseline remains 1 moderate, 4 high, and 1
 critical advisory, primarily in the current exact Next.js pin and its transitive dependencies.
-PR CI status is recorded after GitHub completes the workflow.
+GitHub CI passed on pull request #10 across the typecheck/lint/test job and all four generated
+OpenTofu validation jobs.
