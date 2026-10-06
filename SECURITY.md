@@ -15,6 +15,27 @@ issue. We aim to acknowledge within a few days.
 - **The app never asks for cloud credentials** and has no code path that sends a request to
   a cloud provider. It generates text; you run Terraform yourself.
 
+## Share-link security boundary
+
+InfraCanvas share links are browser-only snapshots stored after the `#` fragment. Browsers do not
+send URL fragments in HTTP requests, and InfraCanvas has no share-link database or upload route.
+Before encoding, the sharing engine:
+
+- accepts only providers and services present in the local catalog;
+- includes only the service's declared configuration fields plus its display name;
+- removes unknown fields and credential-shaped keys such as passwords, tokens, secrets, access
+  keys, API keys, client secrets, and private keys;
+- limits individual values, project names, graph size, connection count, coordinates, and the
+  final fragment length; and
+- revalidates the payload on import, removes unknown services, deduplicates connections, drops
+  dangling/self-referential edges, and assigns fresh local identifiers.
+
+This boundary reduces accidental disclosure; it does not turn a share link into a secret-sharing
+system. Payloads are encoded, not encrypted. Anyone who receives a link can inspect its sanitized
+diagram, links cannot be revoked, and browser history or messaging systems may retain them. Never
+put credentials or secrets into diagram fields. Use a controlled document or repository workflow
+when access control, expiry, revocation, or audit logs are required.
+
 ## How generated Terraform handles secrets
 
 Credentials are never written into the generated configuration as literals. Anything

@@ -16,6 +16,12 @@ export {
   planNodeDefaults,
 } from "../../lib/ai-architect";
 export { removeDiagramEdge } from "../../lib/diagram";
+export { decodeSharedDiagram, encodeSharedDiagram, shareLimits } from "../../lib/share-diagram";
+export {
+  instantiateProductionTemplate,
+  productionTemplateById,
+  PRODUCTION_TEMPLATES,
+} from "../../lib/templates";
 export {
   canvasTerraformResources,
   highestDriftSeverity,
