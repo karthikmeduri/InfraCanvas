@@ -17,6 +17,14 @@ export {
 } from "../../lib/ai-architect";
 export { removeDiagramEdge } from "../../lib/diagram";
 export {
+  ARCHITECTURE_REVIEW_MARKER,
+  architectureChangeMarkdown,
+  compareArchitectureSnapshots,
+  createArchitectureSnapshot,
+  emptyArchitectureSnapshot,
+  parseArchitectureSnapshot,
+} from "../../lib/change-intelligence";
+export {
   canvasTerraformResources,
   highestDriftSeverity,
   matchDriftFindings,

@@ -19,6 +19,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [x] Pulumi TypeScript project generation from the same architecture
 - [x] StateLens imports for Terraform state, Terraform plan JSON, and Pulumi stack exports
 - [x] TFwhy drift reports mapped to affected canvas resources
+- [x] Change Intelligence repository snapshots with architecture pull request reports
 - [x] SVG, PNG, JSON, Terraform, and Pulumi project exports
 - [x] Secure production-scale example architectures for every supported provider
 
@@ -30,11 +31,11 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [ ] Add nested VPC, VNet, and VCN boundary groups
 - [ ] Add cost estimates with region, size, and usage assumptions shown explicitly
 - [ ] Generate reusable module boundaries instead of only flat resource sets
-- [ ] Add architecture version diffs that explain nodes, connections, and configuration changes
+- [x] Add architecture version diffs that explain nodes, connections, and configuration changes
 
 ## Later: controlled delivery and collaboration
 
-- [ ] Git provider integration that exports to a branch and opens a pull request
+- [ ] Full Git provider integration that exports generated IaC to a branch and opens a pull request
 - [ ] CI templates for formatting, validation, policy checks, and preview artifacts
 - [ ] Review-gated deployment using short-lived cloud credentials
 - [ ] Plan-before-apply, explicit approval, audit history, and cancellation controls
