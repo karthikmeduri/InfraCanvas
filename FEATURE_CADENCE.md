@@ -11,7 +11,7 @@ explicitly scoped end-to-end slice with remaining work recorded.
 | 3 | Secure cloud connection | Complete | [`codex/feature-secure-cloud-connection` · PR #8](https://github.com/karthikmeduri/InfraCanvas/pull/8) | AWS OIDC trust-packet slice with no token broker or credential storage; all five CI jobs pass. Other providers remain follow-up work. |
 | 4 | Cost and security overlays | Complete | [`codex/feature-cost-security-overlays` · PR #9](https://github.com/karthikmeduri/InfraCanvas/pull/9) | Deterministic local planning ranges and bounded configuration checks; all five CI jobs pass. Not billing quotes or live vulnerability scans. |
 | 5 | Shareable diagrams and template gallery | Complete | [`codex/feature-shareable-template-gallery` · PR #10](https://github.com/karthikmeduri/InfraCanvas/pull/10) | Sanitized URL-fragment sharing and four-cloud production gallery; all five CI jobs pass. Links are not encrypted or access-controlled. |
-| 6 | Team workspaces and review collaboration | In progress | `codex/feature-team-review-collaboration` | Local-first Review Room slice: redacted versions, anchored threads, decisions, portable packet, and audit summary. Hosted auth/realtime remain future work. |
+| 6 | Team workspaces and review collaboration | Complete | [`codex/feature-team-review-collaboration` · PR #11](https://github.com/karthikmeduri/InfraCanvas/pull/11) | Local-first Review Room slice: redacted versions, anchored threads, decisions, portable packet, and audit summary. Hosted auth/realtime remain future work. |
 | 7 | Reusable architecture components | Next | — | Typed, versioned organization components |
 | 8 | Kubernetes and Crossplane support | Planned | — | Workloads, compositions, and ownership graph |
 | 9 | Zero Trust AI Architect | Planned | — | One-way, catalog-constrained prompting without retrieval access |
@@ -50,5 +50,5 @@ explicitly scoped end-to-end slice with remaining work recorded.
 - Known dependency baseline: `npm audit --omit=dev --audit-level=high` reports 1 moderate, 4 high,
   and 1 critical pre-existing advisories. Dependencies are unchanged; the suggested Next.js fix is
   outside the exact pin and requires a dedicated vinext compatibility update.
-- Pull request: pending.
+- Pull request: [#11](https://github.com/karthikmeduri/InfraCanvas/pull/11)
 - Next: reusable versioned architecture components.
