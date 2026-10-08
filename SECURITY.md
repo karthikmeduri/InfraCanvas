@@ -12,6 +12,10 @@ issue. We aim to acknowledge within a few days.
   backend API, no account system, and no analytics or telemetry.
 - **Projects are stored in `localStorage`** under `infracanvas.project.v2`, on your machine
   only. Clearing site data removes them.
+- **Review Rooms are stored in `localStorage`** under `infracanvas.review-room.v1`. Exported
+  review packets contain names, comments, decisions, activity, resource anchors, and structural
+  digests. They intentionally exclude resource configuration values, generated code, state,
+  inventory, and credentials.
 - **The app never asks for cloud credentials** and has no code path that sends a request to
   a cloud provider. It generates text; you run Terraform yourself.
 
@@ -64,6 +68,8 @@ Reports we are interested in:
   public exposure that the diagram did not ask for)
 - Any path that writes a secret into generated output or to disk
 - Cross-site scripting via project names, resource names, or restored `localStorage` data
+- Review-packet validation bypasses, secret leakage, unsafe resource anchors, or denial-of-service
+  paths that evade the packet size and collection limits
 - Supply-chain concerns in the dependency tree
 
 Out of scope: the security of infrastructure you deploy after editing the generated

@@ -45,6 +45,7 @@ flowchart LR
 | Terraform or Pulumi state | An editable architecture diagram through StateLens |
 | A TFwhy drift report | Drift findings mapped back to the affected canvas resources |
 | A repository architecture snapshot | A pull-request review with resource, connection, risk, and layout changes |
+| A local architecture review | Resource-anchored comments, structural versions, decisions, and a portable redacted packet |
 
 This is why InfraCanvas is **The Bidirectional IaC Workspace**: prompt-to-diagram,
 diagram-to-IaC, state-to-diagram, and drift-to-canvas live in one open-source application.
@@ -60,6 +61,19 @@ risk-oriented warnings; and downloadable before/after SVG diagrams. Credential-s
 redacted, snapshot input is strictly validated, and forked pull requests remain read-only.
 
 See [the Change Intelligence guide](docs/change-intelligence.md) for setup and the local CLI.
+
+## Review Room — local-first architecture collaboration
+
+Open **Review** from any canvas to create a browser-local review room. Add named owners,
+reviewers, and viewers; capture redacted structural checkpoints; anchor comments to individual
+resources; resolve discussion threads; and record approval or requested changes. Export a bounded
+JSON packet for another reviewer or a human-readable Markdown summary for an issue or pull request.
+
+This first collaboration slice is deliberately honest about its boundary: it is an asynchronous,
+portable workflow, not a hosted multi-user service. Roles coordinate the review but do not provide
+authentication. Packets contain collaboration metadata and topology digests only—never resource
+configuration values, generated code, imported state, live inventory, or credentials. See the
+[Review Room guide](docs/review-room.md).
 
 This repository is created by **Karthik Meduri**, **Sai Sravan Meduri**, and **Srikar Podicheti**.
 

@@ -20,6 +20,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [x] StateLens imports for Terraform state, Terraform plan JSON, and Pulumi stack exports
 - [x] TFwhy drift reports mapped to affected canvas resources
 - [x] Change Intelligence repository snapshots with architecture pull request reports
+- [x] Local-first Review Room with comments, redacted versions, decisions, and portable review packets
 - [x] SVG, PNG, JSON, Terraform, and Pulumi project exports
 - [x] Secure production-scale example architectures for every supported provider
 
@@ -39,7 +40,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [ ] CI templates for formatting, validation, policy checks, and preview artifacts
 - [ ] Review-gated deployment using short-lived cloud credentials
 - [ ] Plan-before-apply, explicit approval, audit history, and cancellation controls
-- [ ] Team workspaces, comments, saved versions, and architecture approval roles
+- [ ] Hosted team workspaces with authenticated membership, server-enforced roles, and real-time presence
 - [ ] Policy packs for public exposure, encryption, backups, identity, and resilience
 - [ ] Shareable read-only architecture links with secrets excluded
 

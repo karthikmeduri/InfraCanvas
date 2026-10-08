@@ -31,3 +31,13 @@ export {
   normalizeTerraformAddress,
   parseTfwhyReport,
 } from "../../lib/drift";
+export {
+  canReview,
+  createReviewPacket,
+  createReviewRoom,
+  createReviewVersion,
+  diagramStructureDigest,
+  parseReviewPacket,
+  reviewPacketMarkdown,
+  validateReviewText,
+} from "../../lib/collaboration";

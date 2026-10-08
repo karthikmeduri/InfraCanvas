@@ -28,6 +28,15 @@ import {
 } from "@/lib/ai-architect";
 import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
 import { StateLensWorkspace, type LoadedState } from "@/app/components/StateLensWorkspace";
+import { ReviewWorkspace } from "@/app/components/ReviewWorkspace";
+import {
+  createReviewPacket,
+  diagramStructureDigest,
+  parseReviewPacket,
+  REVIEW_STORAGE_KEY,
+  reviewPacketMarkdown,
+  type ReviewRoom,
+} from "@/lib/collaboration";
 import {
   canvasTerraformResources,
   highestDriftSeverity,
@@ -166,6 +175,9 @@ export default function Home() {
   const [stateLensOpen, setStateLensOpen] = useState(false);
   const [stateLensImport, setStateLensImport] = useState<LoadedState | null>(null);
   const [stateLensError, setStateLensError] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewRoom, setReviewRoom] = useState<ReviewRoom | null>(null);
+  const [reviewStorageReady, setReviewStorageReady] = useState(false);
   const [welcomeFeature, setWelcomeFeature] = useState<"statelens" | "drift" | null>(null);
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -327,6 +339,7 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setReviewOpen(false);
     if (welcomeFeature) setProviderPickerOpen(true);
     setWelcomeFeature(null);
   };
@@ -336,6 +349,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setStateLensOpen(false);
+    setReviewOpen(false);
     setDriftOpen(true);
     if (fromWelcome) setWelcomeFeature("drift");
   };
@@ -345,6 +359,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
+    setReviewOpen(false);
     setStateLensOpen(true);
     if (fromWelcome) setWelcomeFeature("statelens");
   };
@@ -354,6 +369,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setReviewOpen(false);
     setCodeOpen(true);
   };
 
@@ -362,10 +378,20 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setReviewOpen(false);
     setExamplePromptOpen(false);
     setAiPlan(null);
     setAiError("");
     setAiArchitectOpen(true);
+  };
+
+  const showReview = () => {
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setAiArchitectOpen(false);
+    setReviewOpen(true);
   };
 
   const requestAiArchitecture = async () => {
@@ -559,7 +585,29 @@ export default function Home() {
       setStorageReady(true);
     }
   }, []);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(REVIEW_STORAGE_KEY);
+    if (stored) {
+      try {
+        setReviewRoom(parseReviewPacket(stored).room);
+      } catch {
+        window.localStorage.removeItem(REVIEW_STORAGE_KEY);
+      }
+    }
+    setReviewStorageReady(true);
+  }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (!reviewStorageReady) return;
+    if (!reviewRoom) {
+      window.localStorage.removeItem(REVIEW_STORAGE_KEY);
+      return;
+    }
+    const packet = createReviewPacket(reviewRoom, { providerId, projectName, nodes, edges }, new Date().toISOString());
+    window.localStorage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(packet));
+  }, [edges, nodes, projectName, providerId, reviewRoom, reviewStorageReady]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1087,6 +1135,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setCodeOpen(false);
+    setReviewOpen(false);
     setSelection([nodeId]);
     setSelectedEdgeId(null);
     window.requestAnimationFrame(() => {
@@ -1460,6 +1509,55 @@ export default function Home() {
     notify("Repository snapshot exported for Change Intelligence");
   };
 
+  const exportReviewPacket = () => {
+    if (!reviewRoom) return;
+    const packet = createReviewPacket(
+      reviewRoom,
+      { providerId, projectName, nodes, edges },
+      new Date().toISOString(),
+    );
+    downloadBlob(
+      new Blob([`${JSON.stringify(packet, null, 2)}\n`], { type: "application/json;charset=utf-8" }),
+      `${bundleName}-review.json`,
+    );
+    notify("Redacted review packet exported");
+  };
+
+  const exportReviewSummary = () => {
+    if (!reviewRoom) return;
+    const packet = createReviewPacket(
+      reviewRoom,
+      { providerId, projectName, nodes, edges },
+      new Date().toISOString(),
+    );
+    downloadBlob(
+      new Blob([reviewPacketMarkdown(packet)], { type: "text/markdown;charset=utf-8" }),
+      `${bundleName}-review.md`,
+    );
+    notify("Review summary exported as Markdown");
+  };
+
+  const importReviewPacket = async (file: File) => {
+    if (file.size > 512 * 1024) {
+      notify("Review packet is larger than the 512 KB safety limit");
+      return;
+    }
+    try {
+      const packet = parseReviewPacket(await file.text(), new Set(nodes.map((node) => node.id)));
+      const currentDigest = diagramStructureDigest({ providerId, projectName, nodes, edges });
+      setReviewRoom(packet.room);
+      setReviewOpen(true);
+      setProviderPickerOpen(false);
+      if (packet.project.providerId !== providerId || packet.project.structuralDigest !== currentDigest) {
+        notify("Review imported — its structure differs from the current canvas");
+      } else {
+        notify("Review packet imported and matched to this canvas");
+      }
+    } catch (cause) {
+      notify(cause instanceof Error ? cause.message : "Unable to import this review packet");
+    }
+  };
+
   /* ------------------------------------------------------------- shortcuts */
   // The listener is attached once; this ref keeps it pointed at the latest
   // command closures without re-subscribing on every render.
@@ -1716,9 +1814,9 @@ export default function Home() {
             Save
           </button>
           <button
-            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen ? "active" : ""}`}
+            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen && !reviewOpen ? "active" : ""}`}
             onClick={showBuilder}
-            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen}
+            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen && !reviewOpen}
             title="Return to the architecture builder"
           >
             <span className="builder-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
@@ -1743,6 +1841,18 @@ export default function Home() {
             <span className="statelens-nav-icon" aria-hidden="true"><i /><i /></span>
             StateLens
             {stateLensImport && <b>{stateLensImport.preview.matched.length}</b>}
+          </button>
+          <button
+            className={`review-nav-button ${reviewOpen ? "active" : ""}`}
+            onClick={showReview}
+            aria-pressed={reviewOpen}
+            title="Review architecture versions, comments, and approvals"
+          >
+            <span className="review-nav-icon" aria-hidden="true"><i /><i /><i /></span>
+            Review
+            {reviewRoom && reviewRoom.comments.some((comment) => !comment.resolvedAt) && (
+              <b>{reviewRoom.comments.filter((comment) => !comment.resolvedAt).length}</b>
+            )}
           </button>
           <button
             className={`ai-nav-button ${aiArchitectOpen ? "active" : ""}`}
@@ -1824,7 +1934,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!codeOpen && !driftOpen && !stateLensOpen && (
+      {!codeOpen && !driftOpen && !stateLensOpen && !reviewOpen && (
         <section
           className="workspace"
           style={{ "--provider-accent": provider.accent } as CSSProperties}
@@ -3263,6 +3373,27 @@ export default function Home() {
             <button onClick={() => setShortcutsOpen(false)}>Close</button>
           </section>
         </div>
+      )}
+
+      {reviewOpen && (
+        <ReviewWorkspace
+          room={reviewRoom}
+          diagram={{ providerId, projectName, nodes, edges }}
+          anchors={nodes.map((node) => {
+            const service = serviceById(provider, node.serviceId);
+            return {
+              id: node.id,
+              label: node.values.name || node.values.display_name || service?.name || node.serviceId,
+            };
+          })}
+          onRoomChange={setReviewRoom}
+          onBack={showBuilder}
+          onExportJson={exportReviewPacket}
+          onExportMarkdown={exportReviewSummary}
+          onImport={(file) => void importReviewPacket(file)}
+          onFocusNode={focusDriftNode}
+          onNotify={notify}
+        />
       )}
 
       {stateLensOpen && (
