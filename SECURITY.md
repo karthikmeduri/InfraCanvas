@@ -12,6 +12,9 @@ issue. We aim to acknowledge within a few days.
   backend API, no account system, and no analytics or telemetry.
 - **Projects are stored in `localStorage`** under `infracanvas.project.v2`, on your machine
   only. Clearing site data removes them.
+- **Reusable components are stored in `localStorage`** under
+  `infracanvas.component-library.v1`. Exporting a component creates a JSON file on your device;
+  importing one does not upload it.
 - **The app never asks for cloud credentials** and has no code path that sends a request to
   a cloud provider. It generates text; you run Terraform yourself.
 
@@ -38,6 +41,21 @@ Supply these from your CI secret store, a secrets manager, or `TF_VAR_` environm
 variables. The downloaded module bundles a `.gitignore` that excludes `*.tfvars` and
 `*.tfstate`, because Terraform state files contain resource attributes and can hold
 secrets in plaintext.
+
+## Reusable component packages
+
+Component capture copies only fields declared by the selected provider service catalog. Keys and
+values that resemble credentials, tokens, passwords, private keys, connection strings, or secrets
+are removed. A package includes only selected resources and the connections between them; it does
+not include outside topology, saved projects, state, generated code, drift data, or cloud access.
+
+Imported packages are untrusted data. InfraCanvas enforces a 1 MB limit, validates the package
+kind and schema, resolves every service and field through the local catalog, checks typed input
+contracts and graph references, rejects control characters and unsafe bounds, and verifies a
+digest over every immutable version. The digest detects accidental or opportunistic modification;
+it is not a cryptographic signature and does not establish author identity. Review imported
+components before inserting them. Hosted distribution, tenant access control, provenance signing,
+and server-enforced organization policy are not part of the local-first release.
 
 ## Review the plan
 

@@ -168,6 +168,21 @@ cp .env.example .env.local
 Without an API key, the same workflow remains testable with a clearly labeled, deterministic local
 catalog draft. The UI never presents that fallback as an AI model response.
 
+## Component Registry — versioned architecture building blocks
+
+Select a working group of resources on the canvas, open **Components**, and capture it as a
+reusable building block. InfraCanvas keeps the internal topology and relative layout, lets the
+author expose catalog-backed fields as typed inputs, and publishes every release as an immutable
+semantic version. Adding a component creates fresh resource and connection IDs, so each instance
+can be configured and evolved independently.
+
+This first end-to-end slice is deliberately local-first. Components are stored in the browser and
+can be exported or imported as bounded JSON packages. The importer verifies package integrity,
+provider services, field names, references, types, and size before accepting anything. Credential-
+shaped fields and values are excluded during capture, and external connections are never packaged.
+See [Versioned architecture components](docs/architecture-components.md) for the workflow,
+security boundary, and current limitations.
+
 ## StateLens — state to architecture
 
 Click **StateLens** to reveal the editable architecture hidden inside existing infrastructure
@@ -250,6 +265,8 @@ also accept any region-supported custom instance type.
   per-node connection list in the inspector
 - **Inspector** — typed controls with conditional fields, live Terraform address preview,
   and a deep link to the registry docs for that resource
+- **Component Registry** — capture selected subgraphs, publish immutable semantic versions,
+  configure typed inputs, and insert fresh independent instances
 - **Code workspace** — switch between Terraform and Pulumi, inspect the full multi-file
   project, copy or download one file, or take the complete deployment bundle as a `.zip`
 - **Exports** — the diagram as standalone SVG or 2× PNG, for your docs and PRs

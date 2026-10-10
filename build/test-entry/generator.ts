@@ -31,3 +31,15 @@ export {
   normalizeTerraformAddress,
   parseTfwhyReport,
 } from "../../lib/drift";
+export {
+  componentPackageJson,
+  componentParameterCandidates,
+  createComponentVersion,
+  instantiateComponentVersion,
+  latestComponentVersion,
+  mergeImportedComponent,
+  nextPatchVersion,
+  parseComponentLibrary,
+  parseComponentPackage,
+  upsertComponentPackage,
+} from "../../lib/architecture-components";
