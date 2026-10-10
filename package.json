@@ -10,7 +10,7 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run build && npm run test:generator && node --test tests/rendered-html.test.mjs",
-    "test:generator": "esbuild build/test-entry/generator.ts --bundle --format=esm --platform=node --outfile=dist/generator-test-bundle.mjs && node --test tests/terraform-generation.test.mjs tests/pulumi-generation.test.mjs tests/exports.test.mjs tests/drift-integration.test.mjs tests/state-lens.test.mjs tests/catalog-expansion.test.mjs tests/ai-architect.test.mjs tests/change-intelligence.test.mjs",
+    "test:generator": "esbuild build/test-entry/generator.ts --bundle --format=esm --platform=node --outfile=dist/generator-test-bundle.mjs && node --test tests/terraform-generation.test.mjs tests/pulumi-generation.test.mjs tests/exports.test.mjs tests/drift-integration.test.mjs tests/state-lens.test.mjs tests/catalog-expansion.test.mjs tests/ai-architect.test.mjs tests/change-intelligence.test.mjs tests/architecture-components.test.mjs",
     "review:architecture": "esbuild build/change-intelligence-cli.ts --bundle --format=esm --platform=node --outfile=dist/change-intelligence.mjs && node dist/change-intelligence.mjs",
     "emit:terraform": "node scripts/emit-terraform.mjs",
     "typecheck": "tsc --noEmit",

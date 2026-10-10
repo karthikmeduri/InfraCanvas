@@ -20,6 +20,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [x] StateLens imports for Terraform state, Terraform plan JSON, and Pulumi stack exports
 - [x] TFwhy drift reports mapped to affected canvas resources
 - [x] Change Intelligence repository snapshots with architecture pull request reports
+- [x] Local Component Registry with immutable versions, typed inputs, and validated package exchange
 - [x] SVG, PNG, JSON, Terraform, and Pulumi project exports
 - [x] Secure production-scale example architectures for every supported provider
 
@@ -42,6 +43,7 @@ This roadmap is public so users can distinguish shipped capability from product 
 - [ ] Team workspaces, comments, saved versions, and architecture approval roles
 - [ ] Policy packs for public exposure, encryption, backups, identity, and resilience
 - [ ] Shareable read-only architecture links with secrets excluded
+- [ ] Hosted organization component registry with access control, signing, provenance, and deprecation policy
 
 ## Deployment safety requirements
 

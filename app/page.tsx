@@ -28,6 +28,15 @@ import {
 } from "@/lib/ai-architect";
 import { DriftWorkspace, type LoadedReport } from "@/app/components/DriftWorkspace";
 import { StateLensWorkspace, type LoadedState } from "@/app/components/StateLensWorkspace";
+import { ArchitectureComponentsWorkspace } from "@/app/components/ArchitectureComponentsWorkspace";
+import {
+  COMPONENT_LIBRARY_STORAGE_KEY,
+  instantiateComponentVersion,
+  parseComponentLibrary,
+  type ArchitectureComponentPackage,
+  type ArchitectureComponentVersion,
+  type ComponentLibrary,
+} from "@/lib/architecture-components";
 import {
   canvasTerraformResources,
   highestDriftSeverity,
@@ -166,6 +175,9 @@ export default function Home() {
   const [stateLensOpen, setStateLensOpen] = useState(false);
   const [stateLensImport, setStateLensImport] = useState<LoadedState | null>(null);
   const [stateLensError, setStateLensError] = useState("");
+  const [componentsOpen, setComponentsOpen] = useState(false);
+  const [componentLibrary, setComponentLibrary] = useState<ComponentLibrary>([]);
+  const [componentStorageReady, setComponentStorageReady] = useState(false);
   const [welcomeFeature, setWelcomeFeature] = useState<"statelens" | "drift" | null>(null);
   const [activeFile, setActiveFile] = useState("main.tf");
   const [issuesOpen, setIssuesOpen] = useState(false);
@@ -327,6 +339,7 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setComponentsOpen(false);
     if (welcomeFeature) setProviderPickerOpen(true);
     setWelcomeFeature(null);
   };
@@ -336,6 +349,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setStateLensOpen(false);
+    setComponentsOpen(false);
     setDriftOpen(true);
     if (fromWelcome) setWelcomeFeature("drift");
   };
@@ -345,6 +359,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setCodeOpen(false);
     setDriftOpen(false);
+    setComponentsOpen(false);
     setStateLensOpen(true);
     if (fromWelcome) setWelcomeFeature("statelens");
   };
@@ -354,6 +369,7 @@ export default function Home() {
     setProviderPickerOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setComponentsOpen(false);
     setCodeOpen(true);
   };
 
@@ -362,10 +378,20 @@ export default function Home() {
     setCodeOpen(false);
     setDriftOpen(false);
     setStateLensOpen(false);
+    setComponentsOpen(false);
     setExamplePromptOpen(false);
     setAiPlan(null);
     setAiError("");
     setAiArchitectOpen(true);
+  };
+
+  const showComponents = () => {
+    setProviderPickerOpen(false);
+    setCodeOpen(false);
+    setDriftOpen(false);
+    setStateLensOpen(false);
+    setAiArchitectOpen(false);
+    setComponentsOpen(true);
   };
 
   const requestAiArchitecture = async () => {
@@ -559,7 +585,24 @@ export default function Home() {
       setStorageReady(true);
     }
   }, []);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(COMPONENT_LIBRARY_STORAGE_KEY);
+    if (stored) {
+      try {
+        setComponentLibrary(parseComponentLibrary(stored, providerById));
+      } catch {
+        window.localStorage.removeItem(COMPONENT_LIBRARY_STORAGE_KEY);
+      }
+    }
+    setComponentStorageReady(true);
+  }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (!componentStorageReady) return;
+    window.localStorage.setItem(COMPONENT_LIBRARY_STORAGE_KEY, JSON.stringify(componentLibrary));
+  }, [componentLibrary, componentStorageReady]);
 
   useEffect(() => {
     if (!toast) return;
@@ -873,6 +916,48 @@ export default function Home() {
     }));
     setSelection(copies.map((node) => node.id));
     notify(copies.length === 1 ? "Resource duplicated" : `${copies.length} resources duplicated`);
+  };
+
+  const insertArchitectureComponent = (
+    component: ArchitectureComponentPackage,
+    version: ArchitectureComponentVersion,
+    overrides: Record<string, string>,
+  ) => {
+    if (component.providerId !== providerId) {
+      notify(`Switch to ${providerById(component.providerId).shortName} before adding this component`);
+      return;
+    }
+    const width = Math.max(...version.nodes.map((node) => node.x + NODE_WIDTH));
+    const height = Math.max(...version.nodes.map((node) => node.y + NODE_HEIGHT));
+    const canvas = canvasRef.current;
+    const centerX = canvas ? (canvas.scrollLeft + canvas.clientWidth / 2) / zoom : CANVAS_WIDTH / 2;
+    const centerY = canvas ? (canvas.scrollTop + canvas.clientHeight / 2) / zoom : CANVAS_HEIGHT / 2;
+    const origin = {
+      x: clamp(centerX - width / 2, 0, Math.max(0, CANVAS_WIDTH - width)),
+      y: clamp(centerY - height / 2, 0, Math.max(0, CANVAS_HEIGHT - height)),
+    };
+    const instance = instantiateComponentVersion(
+      component,
+      version,
+      overrides,
+      origin,
+      nextId("component"),
+    );
+    const insertedNodes = instance.nodes.map((node) => ({
+      ...node,
+      x: clamp(node.x, 0, CANVAS_WIDTH - NODE_WIDTH),
+      y: clamp(node.y, 0, CANVAS_HEIGHT - NODE_HEIGHT),
+    }));
+    commit((current) => ({
+      nodes: [...current.nodes, ...insertedNodes],
+      edges: [...current.edges, ...instance.edges],
+    }));
+    setSelection(insertedNodes.map((node) => node.id));
+    setSelectedEdgeId(null);
+    setComponentsOpen(false);
+    window.requestAnimationFrame(() => {
+      if (insertedNodes[0]) revealNode(insertedNodes[0].id);
+    });
   };
 
   const clearCanvas = () => {
@@ -1716,9 +1801,9 @@ export default function Home() {
             Save
           </button>
           <button
-            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen ? "active" : ""}`}
+            className={`builder-nav-button ${!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen && !componentsOpen ? "active" : ""}`}
             onClick={showBuilder}
-            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen}
+            aria-pressed={!codeOpen && !driftOpen && !stateLensOpen && !aiArchitectOpen && !componentsOpen}
             title="Return to the architecture builder"
           >
             <span className="builder-nav-icon" aria-hidden="true"><i /><i /><i /><i /></span>
@@ -1743,6 +1828,16 @@ export default function Home() {
             <span className="statelens-nav-icon" aria-hidden="true"><i /><i /></span>
             StateLens
             {stateLensImport && <b>{stateLensImport.preview.matched.length}</b>}
+          </button>
+          <button
+            className={`components-nav-button ${componentsOpen ? "active" : ""}`}
+            onClick={showComponents}
+            aria-pressed={componentsOpen}
+            title="Capture and reuse versioned architecture components"
+          >
+            <span className="components-nav-icon" aria-hidden="true"><i /><i /><i /></span>
+            Components
+            {componentLibrary.length > 0 && <b>{componentLibrary.length}</b>}
           </button>
           <button
             className={`ai-nav-button ${aiArchitectOpen ? "active" : ""}`}
@@ -1824,7 +1919,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!codeOpen && !driftOpen && !stateLensOpen && (
+      {!codeOpen && !driftOpen && !stateLensOpen && !componentsOpen && (
         <section
           className="workspace"
           style={{ "--provider-accent": provider.accent } as CSSProperties}
@@ -3263,6 +3358,19 @@ export default function Home() {
             <button onClick={() => setShortcutsOpen(false)}>Close</button>
           </section>
         </div>
+      )}
+
+      {componentsOpen && (
+        <ArchitectureComponentsWorkspace
+          providerId={providerId}
+          selectedNodes={selectedNodes}
+          diagramEdges={edges}
+          library={componentLibrary}
+          onLibraryChange={setComponentLibrary}
+          onInsert={insertArchitectureComponent}
+          onBack={showBuilder}
+          onNotify={notify}
+        />
       )}
 
       {stateLensOpen && (
