@@ -12,7 +12,7 @@ explicitly scoped end-to-end slice with remaining work recorded.
 | 4 | Cost and security overlays | Complete | [`codex/feature-cost-security-overlays` · PR #9](https://github.com/karthikmeduri/InfraCanvas/pull/9) | Cost/security insight slice; five CI jobs passed. Open PR currently needs a maintainer rebase before merge. |
 | 5 | Shareable diagrams and template gallery | Complete | [`codex/feature-shareable-template-gallery` · PR #10](https://github.com/karthikmeduri/InfraCanvas/pull/10) | Secure share/template slice; five CI jobs passed. Open PR currently needs a maintainer rebase before merge. |
 | 6 | Team workspaces and review collaboration | Complete | [`codex/feature-team-review-collaboration` · PR #11](https://github.com/karthikmeduri/InfraCanvas/pull/11) | Local-first Review Room slice; five CI jobs passed and PR is mergeable. |
-| 7 | Reusable architecture components | In progress | `codex/feature-versioned-architecture-components` | Local Component Registry slice: immutable versions, typed inputs, bounded package exchange, and fresh-ID instantiation. |
+| 7 | Reusable architecture components | Complete | [`codex/feature-versioned-architecture-components` · PR #12](https://github.com/karthikmeduri/InfraCanvas/pull/12) | Local Component Registry slice: immutable versions, typed inputs, bounded package exchange, and fresh-ID instantiation. Full build, 52 generator/security tests, 4 rendered tests, typecheck, lint, OpenTofu formatting, and responsive browser QA passed. |
 | 8 | Kubernetes and Crossplane support | Next | — | Workloads, compositions, and ownership graph |
 | 9 | Zero Trust AI Architect | Planned | — | One-way, catalog-constrained prompting without retrieval access |
 
@@ -45,5 +45,11 @@ explicitly scoped end-to-end slice with remaining work recorded.
   removal, graph validation, and deterministic integrity checks.
 - Documented that browser-local storage and integrity digests are not substitutes for hosted
   access control, publisher identity, cryptographic signing, provenance, or organization policy.
-- Verification and pull request evidence will be recorded when the branch is published.
+- Pull request: [#12](https://github.com/karthikmeduri/InfraCanvas/pull/12)
+- Verification: production build, 52 generator/security tests, 4 rendered tests, typecheck,
+  lint, OpenTofu formatting, and responsive browser QA passed. GitHub provider validation is
+  tracked on the pull request.
+- Known repository baseline: `npm audit --omit=dev --audit-level=high` reports one moderate,
+  four high, and one critical production dependency advisory; the available complete Next.js fix
+  is outside the pinned range, so this feature does not force an unrelated framework upgrade.
 - Next: Kubernetes and Crossplane support.
